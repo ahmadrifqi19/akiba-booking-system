@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Booking, BookingSchedule } from '@/types/database';
+import { Booking, BookingSchedule, Unit } from '@/types/database';
 import { formatRupiah, formatTimeShort } from '@/lib/utils';
+import { supabase } from '@/lib/client';
 import {
   X,
   User,
@@ -15,6 +16,8 @@ import {
   ExternalLink,
   CreditCard,
   StickyNote,
+  Edit3,
+  Save,
 } from 'lucide-react';
 
 interface BookingDetailModalProps {
@@ -22,11 +25,13 @@ interface BookingDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   isKasirMode?: boolean;
+  units?: Unit[];
   onUpdateStatus?: (
     bookingId: string,
     status: Booking['status_booking'],
     statusBayar?: Booking['status_pembayaran']
   ) => Promise<{ success: boolean; error?: string }>;
+  onBookingUpdated?: () => void;
 }
 
 export default function BookingDetailModal({
@@ -34,12 +39,88 @@ export default function BookingDetailModal({
   isOpen,
   onClose,
   isKasirMode = false,
+  units = [],
   onUpdateStatus,
+  onBookingUpdated,
 }: BookingDetailModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTanggal, setEditTanggal] = useState('');
+  const [editJamMulai, setEditJamMulai] = useState('');
+  const [editDurasi, setEditDurasi] = useState(1);
+  const [editKodeUnit, setEditKodeUnit] = useState('');
+  
+  const [fetchedUnits, setFetchedUnits] = useState<Unit[]>([]);
 
   if (!isOpen || !booking) return null;
+
+  const activeUnits = (units && units.length > 0) ? units : fetchedUnits;
+  const availableUnits = activeUnits.length > 0 
+    ? activeUnits 
+    : [{ kode_unit: booking.kode_unit, kelas: 'Standard' } as Unit];
+
+  const handleStartEdit = async () => {
+    setEditTanggal(booking.tanggal_booking || '');
+    setEditJamMulai(booking.jam_mulai || '10:00');
+    setEditDurasi(booking.durasi_efektif || 1);
+    setEditKodeUnit(booking.kode_unit || '');
+    setIsEditing(true);
+    setErrorMessage(null);
+
+    if (!units || units.length === 0) {
+      try {
+        const { data, error } = await supabase.from('units').select('*');
+        if (!error && data) {
+          setFetchedUnits(data as Unit[]);
+        }
+      } catch (err) {
+        console.error('Gagal mengambil daftar unit:', err);
+      }
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdating(true);
+    setErrorMessage(null);
+
+    try {
+      const [hourStr, minStr] = editJamMulai.split(':');
+      const startMinutes = parseInt(hourStr) * 60 + parseInt(minStr);
+      const endMinutes = startMinutes + editDurasi * 60;
+      const endHour = Math.floor(endMinutes / 60) % 24;
+      const endMin = endMinutes % 60;
+      const editJamSelesai = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          tanggal_booking: editTanggal,
+          jam_mulai: editJamMulai,
+          jam_selesai: editJamSelesai,
+          durasi_efektif: editDurasi,
+          kode_unit: editKodeUnit,
+        })
+        .eq('id', booking.id);
+
+      if (error) throw error;
+
+      setIsEditing(false);
+      
+      // Panggil callback pembaharuan agar UI langsung sinkron seketika
+      if (onBookingUpdated) {
+        onBookingUpdated();
+      }
+      
+      onClose();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Gagal memperbarui jadwal booking.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleStatusChange = async (
     newStatus: Booking['status_booking'],
@@ -53,6 +134,9 @@ export default function BookingDetailModal({
       if (!result.success) {
         setErrorMessage(result.error || 'Perubahan booking gagal disimpan.');
         return;
+      }
+      if (onBookingUpdated) {
+        onBookingUpdated();
       }
       onClose();
     } catch (error) {
@@ -125,95 +209,187 @@ export default function BookingDetailModal({
               <p className="text-xs text-slate-500">{booking.tanggal_booking}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Tutup detail booking" className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-3.5 py-4 text-xs">
-          <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200/80 bg-slate-50 p-3.5 sm:grid-cols-2">
-            <div>
-              <span className="mb-0.5 block text-[11px] text-slate-500">Pelanggan</span>
-              <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-                <User className="h-3.5 w-3.5 text-slate-500" />{booking.nama_pelanggan}
-              </div>
-            </div>
-            <div>
-              <span className="mb-0.5 block text-[11px] text-slate-500">WhatsApp</span>
-              <a href={waUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-mono font-medium text-[#007AFF] hover:underline">
-                <Phone className="h-3.5 w-3.5" />{booking.no_whatsapp}<ExternalLink className="h-2.5 w-2.5" />
-              </a>
-            </div>
-            <div>
-              <span className="mb-0.5 block text-[11px] text-slate-500">Waktu Sewa</span>
-              <div className="flex items-center gap-1.5 font-mono font-semibold text-slate-900">
-                <Clock className="h-3.5 w-3.5 text-slate-500" />
-                {formatTimeShort(booking.jam_mulai)} - {formatTimeShort(booking.jam_selesai)} ({booking.durasi_efektif} jam)
-              </div>
-            </div>
-            <div>
-              <span className="mb-0.5 block text-[11px] text-slate-500">Sumber Booking</span>
-              <span className="font-medium text-slate-800">{booking.sumber_booking}</span>
-            </div>
-            {'operator_kasir' in booking && (
-              <div>
-                <span className="mb-0.5 block text-[11px] text-slate-500">Operator Kasir</span>
-                <span className="font-medium text-slate-800">{booking.operator_kasir || 'Belum tercatat'}</span>
-              </div>
-            )}
-          </div>
-
-          {booking.catatan && (
-            <div className="rounded-lg border border-slate-200/80 bg-slate-50 p-3">
-              <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500"><StickyNote className="h-3 w-3" />Catatan Internal</span>
-              <p className="mt-1 font-medium text-slate-800">{booking.catatan}</p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-3.5">
-            <div>
-              <span className="block text-[11px] text-slate-500">Biaya Sewa · {booking.durasi_efektif} jam</span>
-              <span className="mt-1 block font-mono text-lg font-bold text-slate-900">{formatRupiah(booking.total)}</span>
-            </div>
-            <span className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-              booking.status_pembayaran === 'Lunas (Bayar di Kasir)'
-                ? 'border-emerald-300 bg-emerald-100/90 text-emerald-950'
-                : 'border-slate-200 bg-slate-100 text-slate-700'
-            }`}>
-              {booking.status_pembayaran}
-            </span>
-          </div>
-        </div>
-
-        {errorMessage && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700">{errorMessage}</p>}
-
-        {onUpdateStatus && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {booking.status_booking === 'Terkonfirmasi' && (
-                <button type="button" onClick={() => handleStatusChange('Active')} disabled={isUpdating} className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-emerald-700 disabled:opacity-50">
-                  <Play className="h-3.5 w-3.5 fill-current" />Mulai Main
-                </button>
-              )}
-              {booking.status_booking === 'Active' && (
-                <button type="button" onClick={() => handleStatusChange('Selesai')} disabled={isUpdating} className="flex items-center gap-1.5 rounded-lg bg-[#007AFF] px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#0066CC] disabled:opacity-50">
-                  <CheckCircle2 className="h-3.5 w-3.5" />Selesaikan Sesi
-                </button>
-              )}
-              {booking.status_pembayaran !== 'Lunas (Bayar di Kasir)' && (
-                <button type="button" onClick={() => handleStatusChange(booking.status_booking, 'Lunas (Bayar di Kasir)')} disabled={isUpdating} className="flex items-center gap-1.5 rounded-lg bg-[#007AFF] px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#0066CC] disabled:opacity-50">
-                  <CreditCard className="h-3.5 w-3.5" />Lunas (Bayar di Kasir)
-                </button>
-              )}
-            </div>
-            {booking.status_booking !== 'Batal' && (
-              <button type="button" onClick={() => {
-                if (confirm('Yakin ingin membatalkan booking ini?')) void handleStatusChange('Batal');
-              }} disabled={isUpdating} className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50">
-                <XCircle className="h-3.5 w-3.5" />Batalkan
+          <div className="flex items-center gap-2">
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => void handleStartEdit()}
+                className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-[#007AFF] hover:bg-blue-100 transition-colors"
+              >
+                <Edit3 className="h-3.5 w-3.5" /> Ubah Jadwal
               </button>
             )}
+            <button type="button" onClick={onClose} aria-label="Tutup detail booking" className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50">
+              <X className="h-4 w-4" />
+            </button>
           </div>
+        </div>
+
+        {isEditing ? (
+          <form onSubmit={(e) => void handleSaveEdit(e)} className="space-y-4 py-4 text-xs">
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-3">
+              <h3 className="font-bold text-slate-900 text-sm">Form Ubah Jadwal & Unit</h3>
+              
+              <div>
+                <label className="block mb-1 font-medium text-slate-700">Tanggal Booking</label>
+                <input
+                  type="date"
+                  value={editTanggal}
+                  onChange={(e) => setEditTanggal(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1 font-medium text-slate-700">Jam Mulai</label>
+                  <input
+                    type="time"
+                    value={editJamMulai}
+                    onChange={(e) => setEditJamMulai(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-slate-700">Durasi (Jam)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={editDurasi}
+                    onChange={(e) => setEditDurasi(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block mb-1 font-medium text-slate-700">Pindah Unit / Room</label>
+                <select
+                  value={editKodeUnit}
+                  onChange={(e) => setEditKodeUnit(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  required
+                >
+                  {availableUnits.map((u) => (
+                    <option key={u.kode_unit} value={u.kode_unit}>
+                      {u.kode_unit} {u.kelas ? `(${u.kelas})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {errorMessage && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700">{errorMessage}</p>}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isUpdating}
+                className="flex items-center gap-1.5 rounded-lg bg-[#007AFF] px-4 py-2 font-semibold text-white shadow-2xs hover:bg-[#0066CC] disabled:opacity-50"
+              >
+                <Save className="h-3.5 w-3.5" /> Simpan Perubahan
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="space-y-3.5 py-4 text-xs">
+              <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200/80 bg-slate-50 p-3.5 sm:grid-cols-2">
+                <div>
+                  <span className="mb-0.5 block text-[11px] text-slate-500">Pelanggan</span>
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+                    <User className="h-3.5 w-3.5 text-slate-500" />{booking.nama_pelanggan}
+                  </div>
+                </div>
+                <div>
+                  <span className="mb-0.5 block text-[11px] text-slate-500">WhatsApp</span>
+                  <a href={waUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-mono font-medium text-[#007AFF] hover:underline">
+                    <Phone className="h-3.5 w-3.5" />{booking.no_whatsapp}<ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </div>
+                <div>
+                  <span className="mb-0.5 block text-[11px] text-slate-500">Waktu Sewa</span>
+                  <div className="flex items-center gap-1.5 font-mono font-semibold text-slate-900">
+                    <Clock className="h-3.5 w-3.5 text-slate-500" />
+                    {formatTimeShort(booking.jam_mulai)} - {formatTimeShort(booking.jam_selesai)} ({booking.durasi_efektif} jam)
+                  </div>
+                </div>
+                <div>
+                  <span className="mb-0.5 block text-[11px] text-slate-500">Sumber Booking</span>
+                  <span className="font-medium text-slate-800">{booking.sumber_booking}</span>
+                </div>
+                {'operator_kasir' in booking && (
+                  <div>
+                    <span className="mb-0.5 block text-[11px] text-slate-500">Operator Kasir</span>
+                    <span className="font-medium text-slate-800">{booking.operator_kasir || 'Belum tercatat'}</span>
+                  </div>
+                )}
+              </div>
+
+              {booking.catatan && (
+                <div className="rounded-lg border border-slate-200/80 bg-slate-50 p-3">
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500"><StickyNote className="h-3 w-3" />Catatan Internal</span>
+                  <p className="mt-1 font-medium text-slate-800">{booking.catatan}</p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-3.5">
+                <div>
+                  <span className="block text-[11px] text-slate-500">Biaya Sewa · {booking.durasi_efektif} jam</span>
+                  <span className="mt-1 block font-mono text-lg font-bold text-slate-900">{formatRupiah(booking.total)}</span>
+                </div>
+                <span className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
+                  booking.status_pembayaran === 'Lunas (Bayar di Kasir)'
+                    ? 'border-emerald-300 bg-emerald-100/90 text-emerald-950'
+                    : 'border-slate-200 bg-slate-100 text-slate-700'
+                }`}>
+                  {booking.status_pembayaran}
+                </span>
+              </div>
+            </div>
+
+            {errorMessage && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700">{errorMessage}</p>}
+
+            {onUpdateStatus && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {booking.status_booking === 'Terkonfirmasi' && (
+                    <button type="button" onClick={() => void handleStatusChange('Active')} disabled={isUpdating} className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-emerald-700 disabled:opacity-50">
+                      <Play className="h-3.5 w-3.5 fill-current" />Mulai Main
+                    </button>
+                  )}
+                  {booking.status_booking === 'Active' && (
+                    <button type="button" onClick={() => void handleStatusChange('Selesai')} disabled={isUpdating} className="flex items-center gap-1.5 rounded-lg bg-[#007AFF] px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#0066CC] disabled:opacity-50">
+                      <CheckCircle2 className="h-3.5 w-3.5" />Selesaikan Sesi
+                    </button>
+                  )}
+                  {booking.status_pembayaran !== 'Lunas (Bayar di Kasir)' && (
+                    <button type="button" onClick={() => void handleStatusChange(booking.status_booking, 'Lunas (Bayar di Kasir)')} disabled={isUpdating} className="flex items-center gap-1.5 rounded-lg bg-[#007AFF] px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#0066CC] disabled:opacity-50">
+                      <CreditCard className="h-3.5 w-3.5" />Lunas (Bayar di Kasir)
+                    </button>
+                  )}
+                </div>
+                {booking.status_booking !== 'Batal' && (
+                  <button type="button" onClick={() => {
+                    if (confirm('Yakin ingin membatalkan booking ini?')) void handleStatusChange('Batal');
+                  }} disabled={isUpdating} className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50">
+                    <XCircle className="h-3.5 w-3.5" />Batalkan
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

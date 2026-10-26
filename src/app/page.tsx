@@ -1,19 +1,29 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useBookingData } from '@/hooks/useBookingData';
 import { getOperationalStartHour, getTodayDateString } from '@/lib/utils';
+import { supabase } from '@/lib/client';
 import DateNavigationBar from '@/components/booking/DateNavigationBar';
 import StatusLegend from '@/components/booking/StatusLegend';
 import TimelineGrid from '@/components/booking/TimelineGrid';
 import BookingDetailModal from '@/components/booking/BookingDetailModal';
-import { BookingSchedule } from '@/types/database';
-import { Radio, RefreshCw } from 'lucide-react';
+import WeeklyMatrixModal from '@/components/booking/WeeklyMatrixModal';
+import { BookingSchedule, Booking } from '@/types/database';
+import { Radio, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// Daftar opsi kategori filter cepat
+const FILTER_OPTIONS = ['Semua', 'Smoking', 'Non Smoking', 'PS5', 'PS4', 'VVIP', 'VIP', 'Reguler'];
 
 export default function CustomerDisplayPage() {
-  // Inisialisasi awal langsung menggunakan getTodayDateString agar tidak terjadi hydration mismatch
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [activeBookingModal, setActiveBookingModal] = useState<BookingSchedule | null>(null);
+
+  // State untuk menyimpan filter kategori unit yang aktif
+  const [selectedFilter, setSelectedFilter] = useState<string>('Semua');
 
   const {
     units,
@@ -23,6 +33,67 @@ export default function CustomerDisplayPage() {
     isSupabaseConfigured,
     refetch,
   } = useBookingData(selectedDate, { publicOnly: true });
+
+  // Fungsi penanganan update status booking secara real-time
+  const handleUpdateBookingStatus = async (
+    bookingId: string,
+    status: Booking['status_booking'],
+    statusBayar?: Booking['status_pembayaran']
+  ) => {
+    try {
+      const updatePayload: {
+        status_booking: Booking['status_booking'];
+        status_pembayaran?: Booking['status_pembayaran'];
+      } = { status_booking: status };
+      
+      if (statusBayar) {
+        updatePayload.status_pembayaran = statusBayar;
+      }
+
+      const { error } = await supabase
+        .from('bookings')
+        .update(updatePayload)
+        .eq('id', bookingId);
+
+      if (error) throw error;
+
+      // Tarik ulang data dan refresh router secara instan
+      await refetch();
+      router.refresh();
+      return { success: true };
+    } catch (err) {
+      return { 
+        success: false, 
+        error: err instanceof Error ? err.message : 'Gagal memperbarui status.' 
+      };
+    }
+  };
+
+  // Logika penyaringan unit berdasarkan filter yang dipilih secara presisi
+  const filteredUnits = units.filter((unit) => {
+    if (selectedFilter === 'Semua') return true;
+
+    const kelas = unit.kelas?.toUpperCase() || '';
+    const zona = unit.preferensi_zona?.toUpperCase() || '';
+    const target = selectedFilter.toUpperCase();
+
+    if (target === 'SMOKING') {
+      const isActuallySmoking = (kelas.includes('SMOKING') || zona.includes('SMOKING')) &&
+                                !(kelas.includes('NON') || zona.includes('NON') || kelas.includes('NON-SMOKING'));
+      return isActuallySmoking;
+    }
+
+    if (target === 'NON SMOKING') {
+      return kelas.includes('NON') || zona.includes('NON') || kelas.includes('NON-SMOKING');
+    }
+
+    const kelasMatch = kelas.includes(target);
+    const zonaMatch = zona.includes(target);
+
+    return kelasMatch || zonaMatch;
+  });
+
+  const operationalHours = `${String(getOperationalStartHour(selectedDate)).padStart(2, '0')}:00 - 02:00`;
 
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas pb-12">
@@ -40,7 +111,7 @@ export default function CustomerDisplayPage() {
               </h1>
             </div>
             <p className="text-xs sm:text-sm text-slate-500">
-              Pantau jadwal ketersediaan room secara live ({String(getOperationalStartHour(selectedDate)).padStart(2, '0')}:00 - 02:00).
+              Pantau jadwal ketersediaan room secara live ({operationalHours}).
             </p>
           </div>
 
@@ -61,19 +132,57 @@ export default function CustomerDisplayPage() {
             </div>
 
             <button
-              onClick={() => refetch()}
+              type="button"
+              onClick={() => void refetch()}
               className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors shadow-2xs"
               title="Refresh Jadwal"
+              aria-label="Refresh Jadwal"
             >
               <RefreshCw className="h-4 w-4" />
             </button>
           </div>
         </div>
 
+        {/* Tombol Pemicu Modal Rekapitulasi Slot 7 Hari */}
+        <div className="flex justify-start">
+          <WeeklyMatrixModal
+            units={filteredUnits}
+            onSelectDate={(dateStr) => {
+              setSelectedDate(dateStr);
+            }}
+          />
+        </div>
+
         {/* Status Legend Guide */}
         <StatusLegend />
 
-        {/* Visual Timeline Grid */}
+        {/* Quick Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+          <div className="flex items-center gap-1 text-slate-400 pr-1 shrink-0 text-xs font-medium">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Filter:</span>
+          </div>
+          {FILTER_OPTIONS.map((filter) => {
+            const isActive = selectedFilter === filter;
+            return (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setSelectedFilter(filter)}
+                className={cn(
+                  'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 shrink-0 border shadow-2xs',
+                  isActive
+                    ? 'bg-[#007AFF] text-white border-[#007AFF]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                )}
+              >
+                {filter === 'Semua' ? 'Semua Unit' : filter}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Visual Timeline Grid dengan Data Ter-filter */}
         {isLoading ? (
           <div className="flex h-96 flex-col items-center justify-center gap-2.5 rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
             <div className="h-7 w-7 border-3 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
@@ -81,7 +190,7 @@ export default function CustomerDisplayPage() {
           </div>
         ) : (
           <TimelineGrid
-            units={units}
+            units={filteredUnits}
             bookings={bookings}
             selectedDate={selectedDate}
             isKasirMode={false}
@@ -96,7 +205,7 @@ export default function CustomerDisplayPage() {
               Sudah menemukan jadwal kamu? Yuk booking sekarang!
             </h3>
           </div>
-          
+
           <a
             href="https://dragonplay.id/portal.php?q=akibacore"
             target="_blank"
@@ -108,12 +217,19 @@ export default function CustomerDisplayPage() {
         </div>
       </div>
 
-      {/* Modal Detail Booking */}
+      {/* Modal Detail Booking dengan Sinkronisasi Router Refresh */}
       {activeBookingModal && (
         <BookingDetailModal
           isOpen={!!activeBookingModal}
           booking={activeBookingModal}
           onClose={() => setActiveBookingModal(null)}
+          isKasirMode={true}
+          units={units}
+          onUpdateStatus={handleUpdateBookingStatus}
+          onBookingUpdated={() => {
+            void refetch();
+            router.refresh();
+          }}
         />
       )}
     </div>
