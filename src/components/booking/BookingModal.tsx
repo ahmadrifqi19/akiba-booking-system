@@ -10,7 +10,8 @@ import {
   CASHIER_OPERATORS,
 } from '@/types/database';
 import { formatRupiah, addHoursToTime, formatTimeShort, getOperationalStartHour } from '@/lib/utils';
-import { X, Clock, User, Phone, AlertCircle, Check, StickyNote, Gamepad2 } from 'lucide-react';
+import { checkMemberEligibility } from '@/lib/memberEligibility';
+import { X, Clock, User, Phone, AlertCircle, Check, Gamepad2, Award, CheckCircle2 } from 'lucide-react';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -41,13 +42,17 @@ export default function BookingModal({
   const [source, setSource] = useState<BookingSumber>('Booking');
   const [operator, setOperator] = useState<CashierOperator | ''>('');
   const [statusBayar, setStatusBayar] = useState<BookingStatusPembayaran>('Belum Bayar');
-  const [catatan, setCatatan] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const currentUnit = useMemo(
     () => units.find((unit) => unit.kode_unit === selectedUnitCode) || units[0],
     [units, selectedUnitCode]
+  );
+
+  const memberEligibility = useMemo(
+    () => checkMemberEligibility(durasi, currentUnit, selectedUnitCode),
+    [durasi, currentUnit, selectedUnitCode]
   );
   const jamSelesai = addHoursToTime(jamMulai, durasi);
   const total = durasi * (currentUnit?.tarif_per_jam || 0);
@@ -84,7 +89,7 @@ export default function BookingModal({
         status_booking: 'Terkonfirmasi',
         sumber_booking: source,
         operator_kasir: operator,
-        catatan: catatan.trim() || undefined,
+        catatan: memberEligibility.statusText,
       });
 
       if (!result.success) {
@@ -98,7 +103,6 @@ export default function BookingModal({
       setSource('Booking');
       setOperator('');
       setStatusBayar('Belum Bayar');
-      setCatatan('');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan booking.');
     } finally {
@@ -200,10 +204,50 @@ export default function BookingModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className={labelClass} htmlFor="booking-note"><StickyNote className={iconClass} />Catatan Internal (opsional)</label>
-              <input id="booking-note" type="text" value={catatan} onChange={(event) => setCatatan(event.target.value)} placeholder="Hanya terlihat oleh operator" className={fieldClass} />
+          <div>
+            <label className={labelClass}>
+              <Award className={iconClass} />
+              Reminder Syarat Member
+            </label>
+            <div
+              className={`flex items-start gap-3 rounded-2xl border p-3.5 transition-all ${
+                memberEligibility.isEligible
+                  ? 'border-emerald-200 bg-emerald-50/70 text-emerald-950'
+                  : 'border-amber-200 bg-amber-50/70 text-amber-950'
+              }`}
+            >
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                  memberEligibility.isEligible
+                    ? 'bg-emerald-500 text-white shadow-xs'
+                    : 'bg-amber-500 text-white shadow-xs'
+                }`}
+              >
+                {memberEligibility.isEligible ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                      memberEligibility.isEligible
+                        ? 'border border-emerald-300 bg-white text-emerald-800'
+                        : 'border border-amber-300 bg-white text-amber-800'
+                    }`}
+                  >
+                    {memberEligibility.statusText}
+                  </span>
+                  <span className="text-[11px] font-medium text-sky-800/80">
+                    ({memberEligibility.category} · Min. {memberEligibility.minHours} Jam)
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-sky-900/80">
+                  {memberEligibility.description}
+                </p>
+              </div>
             </div>
           </div>
 

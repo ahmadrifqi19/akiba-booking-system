@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Booking, BookingSchedule, Unit } from '@/types/database';
 import {
   formatRupiah,
@@ -8,6 +8,7 @@ import {
   getOperationalBookingStart,
   getOperationalStartHour,
 } from '@/lib/utils';
+import { checkMemberEligibility } from '@/lib/memberEligibility';
 import { supabase } from '@/lib/client';
 import {
   X,
@@ -19,7 +20,8 @@ import {
   CheckCircle2,
   XCircle,
   ExternalLink,
-  StickyNote,
+  Award,
+  AlertCircle,
   Edit3,
   Save,
 } from 'lucide-react';
@@ -58,12 +60,31 @@ export default function BookingDetailModal({
 
   const [fetchedUnits, setFetchedUnits] = useState<Unit[]>([]);
 
-  if (!isOpen || !booking) return null;
+  useEffect(() => {
+    if (isOpen && (!units || units.length === 0) && fetchedUnits.length === 0) {
+      void supabase
+        .from('units')
+        .select('*')
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setFetchedUnits(data as Unit[]);
+          }
+        });
+    }
+  }, [isOpen, units, fetchedUnits.length]);
 
-  const activeUnits = (units && units.length > 0) ? units : fetchedUnits;
+  const activeUnits = units && units.length > 0 ? units : fetchedUnits;
   const availableUnits = activeUnits.length > 0
     ? activeUnits
-    : [{ kode_unit: booking.kode_unit, kelas: 'Standard' } as Unit];
+    : (booking?.kode_unit ? [{ kode_unit: booking.kode_unit, kelas: 'Standard' } as Unit] : []);
+
+  const currentUnit = booking ? availableUnits.find((u) => u.kode_unit === booking.kode_unit) : undefined;
+  const memberEligibility = useMemo(() => {
+    if (!booking) return null;
+    return checkMemberEligibility(booking.durasi_efektif, currentUnit, booking.kode_unit);
+  }, [booking, currentUnit]);
+
+  if (!isOpen || !booking || !memberEligibility) return null;
 
   const handleStartEdit = async () => {
     setEditTanggal(booking.tanggal_booking || '');
@@ -107,6 +128,9 @@ export default function BookingDetailModal({
       const endMin = endMinutes % 60;
       const editJamSelesai = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
 
+      const targetUnit = availableUnits.find((u) => u.kode_unit === editKodeUnit);
+      const editEligibility = checkMemberEligibility(editDurasi, targetUnit, editKodeUnit);
+
       const { error } = await supabase
         .from('bookings')
         .update({
@@ -115,6 +139,7 @@ export default function BookingDetailModal({
           jam_selesai: editJamSelesai,
           durasi_efektif: editDurasi,
           kode_unit: editKodeUnit,
+          catatan: editEligibility.statusText,
         })
         .eq('id', booking.id);
 
@@ -373,12 +398,46 @@ export default function BookingDetailModal({
                 )}
               </div>
 
-              {booking.catatan && (
-                <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3.5">
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-amber-700"><StickyNote className="h-3 w-3" />Catatan Internal</span>
-                  <p className="mt-1 font-medium text-amber-950">{booking.catatan}</p>
+              <div
+                className={`rounded-2xl border p-3.5 transition-all ${
+                  memberEligibility.isEligible
+                    ? 'border-emerald-200 bg-emerald-50/70 text-emerald-950'
+                    : 'border-amber-200 bg-amber-50/70 text-amber-950'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`flex items-center gap-1 text-[11px] font-medium ${
+                      memberEligibility.isEligible ? 'text-emerald-700' : 'text-amber-700'
+                    }`}
+                  >
+                    <Award className="h-3.5 w-3.5" />
+                    Reminder Syarat Member ({memberEligibility.category})
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      memberEligibility.isEligible
+                        ? 'border border-emerald-300 bg-white text-emerald-800'
+                        : 'border border-amber-300 bg-white text-amber-800'
+                    }`}
+                  >
+                    Min. {memberEligibility.minHours} Jam
+                  </span>
                 </div>
-              )}
+                <div className="mt-1.5 flex items-center gap-1.5 font-semibold">
+                  {memberEligibility.isEligible ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  )}
+                  <span className="text-xs">
+                    {memberEligibility.statusText}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-sky-900/80">
+                  {memberEligibility.description}
+                </p>
+              </div>
 
               <div className="flex items-center justify-between rounded-2xl border border-sky-200 bg-linear-to-br from-sky-100 to-sky-50 p-4 shadow-[0_8px_20px_-12px_rgba(14,165,233,0.6)]">
                 <div>
