@@ -93,11 +93,22 @@ export const getInitialBookings = (targetDate?: string): Booking[] => {
     const unit = INITIAL_UNITS.find((item) => item.kode_unit === sample.kode_unit)!;
     const biaya_main = sample.durasi_efektif * unit.tarif_per_jam;
 
+    let itemDate = today;
+    if (!targetDate) {
+      const d = new Date(today + 'T00:00:00');
+      if (index === 2) d.setDate(d.getDate() - 1);
+      if (index === 3) d.setDate(d.getDate() - 4);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      itemDate = `${yyyy}-${mm}-${dd}`;
+    }
+
     return {
       ...sample,
       timestamp_input: `2026-10-22T${String(10 + index).padStart(2, '0')}:00:00Z`,
       kode_cabang: 'CBG-01',
-      tanggal_booking: today,
+      tanggal_booking: itemDate,
       biaya_main,
       total: biaya_main,
       sumber_booking: 'Booking',

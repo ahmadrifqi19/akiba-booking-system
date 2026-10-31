@@ -11,7 +11,7 @@ import TimelineGrid from '@/components/booking/TimelineGrid';
 import BookingDetailModal from '@/components/booking/BookingDetailModal';
 import WeeklyMatrixModal from '@/components/booking/WeeklyMatrixModal';
 import { BookingSchedule, Booking } from '@/types/database';
-import { Radio, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { Radio, RefreshCw, SlidersHorizontal, Gamepad2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Daftar opsi kategori filter cepat
@@ -96,33 +96,37 @@ export default function CustomerDisplayPage() {
   const operationalHours = `${String(getOperationalStartHour(selectedDate)).padStart(2, '0')}:00 - 02:00`;
 
   return (
-    <div className="flex min-h-full w-full flex-col bg-canvas pb-12">
+    <div className="flex min-h-full w-full flex-col bg-linear-to-b from-sky-50/40 to-white pb-12">
       {/* 7-Day Date Navigation */}
       <DateNavigationBar selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-5 space-y-4">
-        {/* Clean Header Bar */}
-        <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.05)] sm:flex-row sm:items-center sm:p-5">
+        
+        {/* Header Bar yang diselaraskan */}
+        <div className="flex flex-col items-start justify-between gap-3 rounded-3xl border border-sky-100 bg-linear-to-br from-sky-50/80 to-white p-4 shadow-[0_12px_40px_-20px_rgba(14,165,233,0.35)] sm:flex-row sm:items-center sm:p-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500 text-white shadow-[0_4px_12px_-3px_rgba(14,165,233,0.7)]">
+                <Gamepad2 className="h-4 w-4" />
+              </span>
+              <h1 className="text-xl sm:text-2xl font-bold text-sky-950 tracking-tight">
                 Jadwal Ketersediaan Akiba Core
               </h1>
             </div>
-            <p className="text-xs sm:text-sm text-slate-500">
+            <p className="text-xs sm:text-sm text-sky-700/80">
               Pantau jadwal ketersediaan room secara live ({operationalHours}).
             </p>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white border border-sky-100 text-xs shadow-2xs">
               <Radio
                 className={`h-3.5 w-3.5 ${
-                  isRealtimeActive ? 'text-emerald-600 animate-pulse' : 'text-slate-400'
+                  isRealtimeActive ? 'text-emerald-500 animate-pulse' : 'text-sky-300'
                 }`}
               />
-              <span className="text-slate-700 font-mono text-[11px]">
+              <span className="text-sky-900 font-mono text-[11px] font-semibold">
                 {isSupabaseConfigured
                   ? isRealtimeActive
                     ? 'Operational Terhubung'
@@ -134,7 +138,7 @@ export default function CustomerDisplayPage() {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors shadow-2xs"
+              className="p-2.5 rounded-2xl border border-sky-100 bg-white hover:bg-sky-50 text-sky-600 hover:text-sky-900 transition-all shadow-2xs active:scale-95"
               title="Refresh Jadwal"
               aria-label="Refresh Jadwal"
             >
@@ -158,8 +162,8 @@ export default function CustomerDisplayPage() {
 
         {/* Quick Filter Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-          <div className="flex items-center gap-1 text-slate-400 pr-1 shrink-0 text-xs font-medium">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1 text-sky-600 pr-1 shrink-0 text-xs font-bold">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-sky-500" />
             <span className="hidden sm:inline">Filter:</span>
           </div>
           {FILTER_OPTIONS.map((filter) => {
@@ -170,10 +174,10 @@ export default function CustomerDisplayPage() {
                 type="button"
                 onClick={() => setSelectedFilter(filter)}
                 className={cn(
-                  'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 shrink-0 border shadow-2xs',
+                  'whitespace-nowrap rounded-2xl px-3.5 py-1.5 text-xs font-bold transition-all active:scale-95 shrink-0 border shadow-2xs',
                   isActive
-                    ? 'bg-[#007AFF] text-white border-[#007AFF]'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    ? 'bg-sky-500 text-white border-sky-500 shadow-[0_4px_12px_-4px_rgba(14,165,233,0.7)]'
+                    : 'bg-white text-sky-800 border-sky-200 hover:bg-sky-50'
                 )}
               >
                 {filter === 'Semua' ? 'Semua Unit' : filter}
@@ -184,9 +188,9 @@ export default function CustomerDisplayPage() {
 
         {/* Visual Timeline Grid dengan Data Ter-filter */}
         {isLoading ? (
-          <div className="flex h-96 flex-col items-center justify-center gap-2.5 rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <div className="h-7 w-7 border-3 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-            <span className="text-xs text-slate-500">Memuat jadwal visual unit...</span>
+          <div className="flex h-96 flex-col items-center justify-center gap-2.5 rounded-3xl border border-sky-100 bg-white shadow-[0_12px_40px_-20px_rgba(14,165,233,0.35)]">
+            <div className="h-7 w-7 border-3 border-sky-200 border-t-sky-500 rounded-full animate-spin" />
+            <span className="text-xs text-sky-600 font-medium">Memuat jadwal visual unit...</span>
           </div>
         ) : (
           <TimelineGrid
@@ -199,20 +203,24 @@ export default function CustomerDisplayPage() {
         )}
 
         {/* Footer / Call to Action Booking Langsung */}
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-3xl border border-sky-100 bg-white p-4 sm:p-5 shadow-[0_12px_40px_-20px_rgba(14,165,233,0.35)]">
           <div className="space-y-0.5 text-center sm:text-left">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+            <h3 className="text-xs sm:text-sm font-bold text-sky-950">
               Sudah menemukan jadwal kamu? Yuk booking sekarang!
             </h3>
+            <p className="text-[11px] text-sky-600/80">
+              Amankan slot room favoritmu di Akiba Core secara instan.
+            </p>
           </div>
 
           <a
             href="https://dragonplay.id/portal.php?q=akibacore"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 rounded-lg bg-[#007AFF] px-4 py-2 text-xs font-semibold text-white shadow-xs transition-transform active:scale-95 shrink-0"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-sky-500 px-5 py-2.5 text-xs font-bold text-white shadow-[0_6px_20px_-6px_rgba(14,165,233,0.7)] hover:bg-sky-600 transition-all active:scale-95 shrink-0"
           >
             <span>Booking Sekarang</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </a>
         </div>
       </div>

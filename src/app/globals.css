@@ -3,30 +3,30 @@
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  --color-canvas: #f5f7fa;
-  --color-system-blue: #007aff;
+  --color-canvas: #f0f7ff;
+  --color-system-blue: #0ea5e9;
 }
 
 @layer base {
   :root {
     color-scheme: light;
-    --background: #f5f7fa;
-    --foreground: #1e1e1e;
+    --background: #f0f7ff;
+    --foreground: #0c4a6e;
     --card: #ffffff;
-    --card-foreground: #1e1e1e;
-    --primary: #007aff;
+    --card-foreground: #0c4a6e;
+    --primary: #0ea5e9;
     --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #334155;
-    --muted: #64748b;
-    --accent: #007aff;
+    --secondary: #e0f2fe;
+    --secondary-foreground: #0369a1;
+    --muted: #38bdf8;
+    --accent: #0ea5e9;
     --accent-foreground: #ffffff;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --border: #e2e8f0;
-    --input: #e2e8f0;
-    --ring: #007aff;
-    --system-blue: #007aff;
+    --border: #bae6fd;
+    --input: #bae6fd;
+    --ring: #0ea5e9;
+    --system-blue: #0ea5e9;
   }
 
   body {
@@ -45,16 +45,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #f5f7fa;
+  background: #f0f7ff;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #7dd3fc;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #38bdf8;
 }
 
 .timeline-sticky-top {
@@ -78,6 +78,6 @@
 
 .card-surface {
   background-color: #ffffff;
-  border: 1px solid rgb(226 232 240 / 80%);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
+  border: 1px solid rgb(186 230 253 / 80%);
+  box-shadow: 0 12px 40px -20px rgb(14 165 233 / 35%);
 }

@@ -6,8 +6,10 @@ import { id } from 'date-fns/locale';
 import { BookingSchedule, Unit } from '@/types/database';
 import {
   getOperationalBookingStart,
+  getOperationalStartHour,
   getTodayDateString,
 } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface WeeklyMatrixGridProps {
   units: Unit[];
@@ -64,18 +66,18 @@ export default function WeeklyMatrixGrid({
   });
 
   return (
-    <div className="overflow-auto max-h-[65vh]">
+    <div className="overflow-auto max-h-[65vh] rounded-2xl border border-sky-100 bg-white shadow-2xs no-scrollbar">
       {units.length === 0 ? (
-        <p className="py-12 text-center text-sm text-slate-500">
+        <p className="py-12 text-center text-xs text-sky-600 font-medium">
           Tidak ada unit yang tersedia untuk ditampilkan.
         </p>
       ) : (
         <table className="w-full min-w-[900px] border-collapse text-left text-xs">
-          <thead className="sticky top-0 z-20 bg-white">
-            <tr className="border-b border-slate-200">
+          <thead className="sticky top-0 z-20 bg-sky-50/95 backdrop-blur-md">
+            <tr className="border-b border-sky-100">
               <th
                 scope="col"
-                className="sticky left-0 z-30 min-w-20 bg-white px-3 py-2 text-slate-600 font-bold"
+                className="sticky left-0 z-30 min-w-20 bg-sky-50 px-3 py-2.5 text-sky-950 font-bold border-r border-sky-100"
               >
                 Jam
               </th>
@@ -83,13 +85,13 @@ export default function WeeklyMatrixGrid({
                 const dateStr = format(date, 'yyyy-MM-dd');
 
                 return (
-                  <th key={dateStr} scope="col" className="min-w-28 px-2 py-2 text-center">
+                  <th key={dateStr} scope="col" className="min-w-28 px-2 py-2.5 text-center border-r border-sky-100/50 last:border-r-0">
                     <button
                       type="button"
                       onClick={() => onSelectDate(dateStr)}
-                      className="rounded-lg px-2 py-1 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-[#007AFF] transition-colors w-full"
+                      className="rounded-xl px-2.5 py-1.5 hover:bg-sky-100/70 focus-visible:outline-2 focus-visible:outline-sky-500 transition-colors w-full group"
                     >
-                      <span className="block font-semibold text-slate-700">
+                      <span className="block font-bold text-sky-950 text-xs group-hover:text-sky-700">
                         {format(date, 'EEE, d MMM', { locale: id })}
                       </span>
                     </button>
@@ -98,17 +100,29 @@ export default function WeeklyMatrixGrid({
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-sky-50">
             {timeRows.map((timeSlot) => (
-              <tr key={timeSlot.minutes} className="hover:bg-slate-50/50">
+              <tr key={timeSlot.minutes} className="hover:bg-sky-50/40 transition-colors">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-mono font-semibold text-slate-700"
+                  className="sticky left-0 z-10 whitespace-nowrap bg-white/95 backdrop-blur-md px-3 py-2 font-mono font-bold text-sky-900 border-r border-sky-100"
                 >
                   {timeSlot.label}
                 </th>
                 {dates.map((date) => {
                   const dateStr = format(date, 'yyyy-MM-dd');
+                  const isClosed = timeSlot.minutes < getOperationalStartHour(dateStr) * 60;
+
+                  if (isClosed) {
+                    return (
+                      <td key={dateStr} className="p-1.5 text-center">
+                        <div className="w-full rounded-xl border border-sky-100/60 bg-sky-50/30 px-2 py-2 text-center text-[10px] font-bold text-sky-400/60 select-none">
+                          Tutup
+                        </div>
+                      </td>
+                    );
+                  }
+
                   const slotTimeValue = timeSlot.value;
                   const slotStart = getOperationalBookingStart(slotTimeValue, dateStr);
                   const availableByClass = new Map(classes.map((category) => [category, 0]));
@@ -140,29 +154,32 @@ export default function WeeklyMatrixGrid({
                   const availabilityRatio = availableCount / units.length;
                   const availabilityStyle =
                     availableCount === 0
-                      ? 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100'
+                      ? 'border-rose-200 bg-rose-50/90 text-rose-900 hover:bg-rose-100'
                       : availabilityRatio >= 0.5
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                        : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100';
+                        ? 'border-emerald-200 bg-emerald-50/90 text-emerald-900 hover:bg-emerald-100'
+                        : 'border-amber-200 bg-amber-50/90 text-amber-900 hover:bg-amber-100';
                   
                   const summary = classes
                     .map((category) => `${category}: ${availableByClass.get(category) ?? 0}`)
                     .join(', ');
 
                   return (
-                    <td key={dateStr} className="p-1 text-center">
+                    <td key={dateStr} className="p-1.5 text-center">
                       <button
                         type="button"
                         onClick={() => onSelectDate(dateStr)}
                         aria-label={`${format(date, 'EEEE d MMMM', {
                           locale: id,
                         })} pukul ${timeSlot.label}, unit kosong: ${summary}`}
-                        className={`w-full rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007AFF] ${availabilityStyle}`}
+                        className={cn(
+                          'w-full rounded-xl border px-2.5 py-1.5 text-left transition-all active:scale-95 shadow-2xs',
+                          availabilityStyle
+                        )}
                       >
                         {classes.map((category) => (
                           <span
                             key={category}
-                            className="block whitespace-nowrap text-[10px] leading-4 font-mono font-medium"
+                            className="block whitespace-nowrap text-[10px] leading-4 font-mono font-bold"
                           >
                             {category}: {availableByClass.get(category) ?? 0}
                           </span>

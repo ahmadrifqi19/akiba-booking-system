@@ -17,13 +17,19 @@ import {
 } from '@/lib/utils';
 
 export function useBookingData<TPublic extends boolean = false>(
-  selectedDate: string,
-  options?: { publicOnly?: TPublic }
+  selectedDate?: string,
+  options?: {
+    publicOnly?: TPublic;
+    allDates?: boolean;
+    startDate?: string;
+    endDate?: string;
+  }
 ) {
   const queryClient = useQueryClient();
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const isConfigured = isSupabaseConfigured();
   const publicOnly = options?.publicOnly ?? false;
+  const isAllDates = options?.allDates ?? false;
   type VisibleBooking = TPublic extends true ? BookingSchedule : Booking;
 
   // 1. Fetch Units
@@ -51,9 +57,13 @@ export function useBookingData<TPublic extends boolean = false>(
     staleTime: 1000 * 60 * 10,
   });
 
-  // 2. Fetch Bookings for Selected Date
+  // 2. Fetch Bookings for Selected Date or All Dates
   const bookingsQuery = useQuery<VisibleBooking[]>({
-    queryKey: ['bookings', selectedDate, publicOnly ? 'public' : 'staff'],
+    queryKey: [
+      'bookings',
+      isAllDates ? 'all' : (selectedDate ?? 'all'),
+      publicOnly ? 'public' : 'staff',
+    ],
     queryFn: async () => {
       if (!isConfigured) {
         console.error('Supabase belum dikonfigurasi. Data booking tidak dapat dimuat.');
@@ -61,17 +71,25 @@ export function useBookingData<TPublic extends boolean = false>(
       }
 
       const supabase = createClient<Database>();
-      const result = publicOnly
-        ? await supabase
+      let query = publicOnly
+        ? supabase
             .from('bookings')
             .select('id,tanggal_booking,jam_mulai,jam_selesai,durasi_efektif,nama_pelanggan,kode_unit,status_booking,sumber_booking')
-            .eq('tanggal_booking', selectedDate)
-            .order('jam_mulai', { ascending: true })
-        : await supabase
+        : supabase
             .from('bookings')
-            .select('*')
-            .eq('tanggal_booking', selectedDate)
-            .order('jam_mulai', { ascending: true });
+            .select('*');
+
+      if (!isAllDates) {
+        if (options?.startDate && options?.endDate) {
+          query = query.gte('tanggal_booking', options.startDate).lte('tanggal_booking', options.endDate);
+        } else if (selectedDate) {
+          query = query.eq('tanggal_booking', selectedDate);
+        }
+      }
+
+      const result = await query
+        .order('tanggal_booking', { ascending: false })
+        .order('jam_mulai', { ascending: true });
 
       if (result.error) {
         console.error('Gagal memuat booking dari Supabase:', result.error.message || JSON.stringify(result.error));
@@ -89,8 +107,12 @@ export function useBookingData<TPublic extends boolean = false>(
     }
 
     const supabase = createClient<Database>();
+    const channelName = isAllDates
+      ? 'public:bookings:all'
+      : `public:bookings:${selectedDate || 'all'}`;
+
     const channel = supabase
-      .channel(`public:bookings:${selectedDate}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -109,7 +131,7 @@ export function useBookingData<TPublic extends boolean = false>(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedDate, queryClient, isConfigured]);
+  }, [selectedDate, isAllDates, queryClient, isConfigured]);
 
   // 4. Create Booking Handler
   const createBooking = useCallback(
@@ -132,9 +154,10 @@ export function useBookingData<TPublic extends boolean = false>(
       const openingStart = getOperationalStartHour(formData.tanggal_booking) * 60;
 
       if (bookingStart < openingStart || bookingEnd > 26 * 60) {
+        const openStr = `${String(Math.floor(openingStart / 60)).padStart(2, '0')}:00`;
         return {
           success: false,
-          error: `Jam booking harus berada dalam jam operasional hingga 02:00 (maksimal ${Math.floor((26 * 60 - bookingStart) / 60)} jam dari waktu mulai).`,
+          error: `Jam booking harus berada dalam jam operasional (${openStr}–02:00, maksimal ${Math.floor((26 * 60 - bookingStart) / 60)} jam dari waktu mulai).`,
         };
       }
 
@@ -188,7 +211,7 @@ export function useBookingData<TPublic extends boolean = false>(
         return { success: false, error: error.message };
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['bookings', formData.tanggal_booking] });
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] });
       return { success: true, booking: data as Booking };
     },
     [unitsQuery.data, bookingsQuery.data, isConfigured, queryClient]

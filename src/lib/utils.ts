@@ -79,7 +79,8 @@ export interface OperationalTimeSlot {
 
 export function getOperationalStartHour(date: string): number {
   const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
-  return dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0 ? 9 : 10;
+  // Sabtu (6) & Minggu (0): 09.00 | Senin - Jumat (1 - 5): 10.00
+  return dayOfWeek === 6 || dayOfWeek === 0 ? 9 : 10;
 }
 
 export function getOperationalTimeSlots(date: string): OperationalTimeSlot[] {
@@ -96,9 +97,10 @@ export function getOperationalTimeSlots(date: string): OperationalTimeSlot[] {
   return slots;
 }
 
-export function getOperationalBookingStart(time: string, date: string): number {
+export function getOperationalBookingStart(time: string, date?: string): number {
   const clockMinutes = timeToMinutes(time);
-  return clockMinutes < getOperationalStartHour(date) * 60
+  // Jam dini hari operasional (00:00 - 05:59) dinormalisasi ke rentang 24:00 - 29:59 (misal: 01:00 -> 25:00)
+  return clockMinutes < 6 * 60
     ? clockMinutes + 24 * 60
     : clockMinutes;
 }

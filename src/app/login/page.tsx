@@ -2,7 +2,8 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Gamepad2, KeyRound } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
+import Image from "next/image";
 import type { UserRole } from '@/lib/auth/session';
 
 export default function LoginPage() {
@@ -40,26 +41,33 @@ export default function LoginPage() {
   };
 
   return (
-    <section className="flex flex-1 items-center justify-center bg-canvas p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+    <section className="flex flex-1 items-center justify-center bg-linear-to-b from-sky-50/40 to-white p-4 min-h-screen">
+      <div className="w-full max-w-sm rounded-3xl border border-sky-100 bg-white p-6 sm:p-8 shadow-[0_12px_40px_-20px_rgba(14,165,233,0.35)]">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#007AFF] text-white">
-            <Gamepad2 className="h-6 w-6" />
+          <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center">
+            <Image
+              src="/akibacore.png"
+              alt="Akiba Core Logo"
+              width={80}
+              height={80}
+              className="h-full w-full object-contain"
+              priority
+            />
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Login Akiba Core</h1>
-          <p className="mt-1 text-sm text-slate-500">Masuk ke panel operasional</p>
+          <h1 className="text-xl font-bold text-sky-950 tracking-tight">Login Akiba Core</h1>
+          <p className="mt-1 text-xs text-sky-600/80">Masuk ke panel operasional sistem</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="login-role" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Role
+            <label htmlFor="login-role" className="mb-1.5 block text-xs font-bold text-sky-950">
+              Role Akses
             </label>
             <select
               id="login-role"
               value={role}
               onChange={(event) => setRole(event.target.value as UserRole)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+              className="w-full rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-xs font-medium text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs"
             >
               <option value="kasir">Kasir</option>
               <option value="owner">Owner</option>
@@ -67,7 +75,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="login-pin" className="mb-1.5 block text-sm font-medium text-slate-700">
+            <label htmlFor="login-pin" className="mb-1.5 block text-xs font-bold text-sky-950">
               PIN / Password
             </label>
             <input
@@ -76,13 +84,13 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={pin}
               onChange={(event) => setPin(event.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+              className="w-full rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-xs font-medium text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs"
               required
             />
           </div>
 
           {error && (
-            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+            <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
               {error}
             </p>
           )}
@@ -90,7 +98,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#007AFF] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0066CC] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-xs font-bold text-white shadow-[0_6px_20px_-6px_rgba(14,165,233,0.7)] hover:bg-sky-600 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <KeyRound className="h-4 w-4" />
             {isSubmitting ? 'Memeriksa...' : 'Login'}

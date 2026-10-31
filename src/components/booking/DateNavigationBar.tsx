@@ -46,11 +46,13 @@ export default function DateNavigationBar({
   // (JANGAN tampilkan tanggal di sini, karena nilainya bisa berbeda)
   if (!isMounted) {
     return (
-      <div className="w-full border-b border-slate-200/85 bg-white/80 px-3 py-3 backdrop-blur-md sm:px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="w-full border-b border-sky-100 bg-linear-to-b from-sky-50/90 to-white/80 px-3 py-3 backdrop-blur-md sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4 text-[#007AFF]" />
-            <span className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500 text-white shadow-[0_4px_10px_-3px_rgba(14,165,233,0.7)]">
+              <CalendarIcon className="h-4 w-4" />
+            </span>
+            <span className="h-4 w-40 animate-pulse rounded-full bg-sky-100" />
           </div>
         </div>
       </div>
@@ -78,14 +80,14 @@ export default function DateNavigationBar({
   const isSelectedToday = isSameDay(selected, today);
 
   return (
-    <div className="w-full border-b border-slate-200/85 bg-white/80 px-3 py-3 backdrop-blur-md sm:px-6">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+    <div className="w-full border-b border-sky-100 bg-linear-to-b from-sky-50/90 to-white/80 px-3 py-3 backdrop-blur-md sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 md:flex-row">
         {/* Left: Judul tanggal & tombol navigasi */}
-        <div className="flex items-center justify-between w-full md:w-auto gap-2">
+        <div className="flex w-full items-center justify-between gap-2 md:w-auto">
           <button
             type="button"
             onClick={handlePrevDay}
-            className="rounded-lg border border-slate-200/80 bg-white p-1.5 text-slate-700 transition-colors hover:bg-slate-50"
+            className="rounded-full border border-sky-100 bg-white p-2 text-sky-600 shadow-[0_4px_12px_-6px_rgba(14,165,233,0.5)] transition-all hover:bg-sky-50 hover:text-sky-700 active:scale-90"
             title="Hari Sebelumnya"
             aria-label="Hari Sebelumnya"
           >
@@ -93,12 +95,14 @@ export default function DateNavigationBar({
           </button>
 
           <div className="flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4 text-[#007AFF]" />
-            <span className="text-sm sm:text-base font-semibold text-slate-900 tracking-tight">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white shadow-[0_4px_10px_-3px_rgba(14,165,233,0.7)]">
+              <CalendarIcon className="h-4 w-4" />
+            </span>
+            <span className="text-sm font-bold tracking-tight text-sky-950 sm:text-base">
               {format(selected, 'EEEE, d MMMM yyyy', { locale: id })}
             </span>
             {isSelectedToday && (
-              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-800">
+              <span className="rounded-full bg-sky-500 px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-[0_4px_10px_-4px_rgba(14,165,233,0.7)]">
                 Hari Ini
               </span>
             )}
@@ -107,7 +111,7 @@ export default function DateNavigationBar({
           <button
             type="button"
             onClick={handleNextDay}
-            className="rounded-lg border border-slate-200/80 bg-white p-1.5 text-slate-700 transition-colors hover:bg-slate-50"
+            className="rounded-full border border-sky-100 bg-white p-2 text-sky-600 shadow-[0_4px_12px_-6px_rgba(14,165,233,0.5)] transition-all hover:bg-sky-50 hover:text-sky-700 active:scale-90"
             title="Hari Berikutnya"
             aria-label="Hari Berikutnya"
           >
@@ -116,7 +120,7 @@ export default function DateNavigationBar({
         </div>
 
         {/* Center: Carousel 7 hari */}
-        <div className="flex w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-slate-200/80 bg-slate-100/80 p-1 md:w-auto no-scrollbar">
+        <div className="no-scrollbar flex w-full items-center gap-1 overflow-x-auto rounded-2xl bg-sky-100/70 p-1 shadow-inner shadow-sky-200/40 md:w-auto">
           {next7Days.map((dateItem) => {
             const dateStr = format(dateItem, 'yyyy-MM-dd');
             const isSelected = effectiveDate === dateStr;
@@ -130,21 +134,21 @@ export default function DateNavigationBar({
                 onClick={() => onSelectDate(dateStr)}
                 aria-pressed={isSelected}
                 className={cn(
-                  'flex min-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-1.5 text-xs font-medium transition-all duration-150 sm:min-w-[82px]',
+                  'flex min-w-[72px] flex-col items-center justify-center rounded-xl px-2 py-1.5 text-xs font-medium transition-all duration-150 active:scale-95 sm:min-w-[82px]',
                   isSelected
-                    ? 'bg-[#007AFF] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
-                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                    ? 'bg-sky-500 font-semibold text-white shadow-[0_6px_16px_-6px_rgba(14,165,233,0.8)]'
+                    : 'text-sky-700 hover:bg-white/80 hover:text-sky-900'
                 )}
               >
                 <span
                   className={cn(
-                    'text-[10px] uppercase font-medium',
-                    isSelected ? 'text-blue-100' : 'text-slate-500'
+                    'text-[10px] font-medium',
+                    isSelected ? 'text-sky-100' : 'text-sky-500'
                   )}
                 >
                   {isToday ? 'Hari Ini' : format(dateItem, 'EEE', { locale: id })}
                 </span>
-                <span className="text-sm font-bold mt-0.5">
+                <span className="mt-0.5 text-sm font-bold">
                   {format(dateItem, 'd MMM', { locale: id })}
                 </span>
               </button>
@@ -153,12 +157,12 @@ export default function DateNavigationBar({
         </div>
 
         {/* Right: Reset & date picker native */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        <div className="flex w-full items-center justify-end gap-2 md:w-auto">
           {!isSelectedToday && (
             <button
               type="button"
               onClick={() => onSelectDate(todayStr)}
-              className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-100 transition-colors"
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-sky-600 transition-all hover:bg-sky-100 hover:text-sky-800 active:scale-95"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Reset Hari Ini
@@ -170,7 +174,7 @@ export default function DateNavigationBar({
               type="date"
               value={effectiveDate}
               onChange={(e) => e.target.value && onSelectDate(e.target.value)}
-              className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-[#007AFF] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20"
+              className="cursor-pointer rounded-full border border-sky-100 bg-white px-3.5 py-1.5 text-xs font-medium text-sky-900 shadow-[0_4px_12px_-6px_rgba(14,165,233,0.5)] focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20"
             />
           </div>
         </div>
