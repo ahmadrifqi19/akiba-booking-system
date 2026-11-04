@@ -9,16 +9,7 @@ export type Json =
 export type BookingStatusPembayaran = 'Belum Bayar' | 'Lunas (Bayar di Kasir)';
 export type BookingStatus = 'Terkonfirmasi' | 'Active' | 'Selesai' | 'Batal';
 export type BookingSumber = 'Booking' | 'Walk-in';
-export type CashierOperator = 'Amar Waly' | 'Indy' | 'Mona' | 'Rakel' | 'Adit' | 'Nida';
-
-export const CASHIER_OPERATORS: CashierOperator[] = [
-  'Amar Waly',
-  'Indy',
-  'Mona',
-  'Rakel',
-  'Adit',
-  'Nida',
-];
+export type CashierOperator = string;
 
 export interface Unit {
   kode_unit: string;
@@ -29,6 +20,43 @@ export interface Unit {
   is_active?: boolean;
   urutan?: number;
   created_at?: string;
+}
+
+export interface Cabang {
+  kode_cabang: string;
+  nama_cabang: string;
+  alamat?: string;
+  no_telepon?: string;
+  is_active?: boolean;
+  jam_buka_weekday?: string;
+  jam_buka_weekend?: string;
+  jam_tutup?: string;
+  created_at?: string;
+}
+
+export interface Operator {
+  id: string;
+  kode_cabang: string;
+  nama_operator: string;
+  created_at?: string;
+}
+
+export interface ZonaRuangan {
+  id: string;
+  nama_zona: string;
+  tipe_rokok: 'Smoking' | 'Non-Smoking';
+  lantai: string;
+  fasilitas?: string;
+  deskripsi?: string;
+}
+
+export interface PengaturanOperasional {
+  kode_cabang: string;
+  jam_buka_weekday: string;
+  jam_buka_weekend: string;
+  jam_tutup: string;
+  durasi_maksimal_jam?: number;
+  catatan?: string;
 }
 
 export interface BookingSchedule {
@@ -98,6 +126,18 @@ export type Database = {
           kode_unit: string;
         };
         Update: Partial<Omit<Booking, never>>;
+        Relationships: [];
+      };
+      cabang: {
+        Row: Omit<Cabang, never>;
+        Insert: Omit<Cabang, never>;
+        Update: Partial<Omit<Cabang, never>>;
+        Relationships: [];
+      };
+      operators: {
+        Row: Omit<Operator, never>;
+        Insert: Omit<Operator, 'id' | 'created_at'> & Partial<Pick<Operator, 'id' | 'created_at'>>;
+        Update: Partial<Omit<Operator, 'id'>>;
         Relationships: [];
       };
     };

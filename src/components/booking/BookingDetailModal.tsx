@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Booking, BookingSchedule, Unit } from '@/types/database';
+import { Booking, BookingSchedule, BookingStatus, Unit } from '@/types/database';
 import {
   formatRupiah,
   formatTimeShort,
@@ -31,6 +31,7 @@ interface BookingDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   isKasirMode?: boolean;
+  requireMemberOfferConfirmation?: boolean;
   units?: Unit[];
   onUpdateStatus?: (
     bookingId: string,
@@ -45,12 +46,14 @@ export default function BookingDetailModal({
   isOpen,
   onClose,
   isKasirMode = false,
+  requireMemberOfferConfirmation = false,
   units = [],
   onUpdateStatus,
   onBookingUpdated,
 }: BookingDetailModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingMemberStatus, setPendingMemberStatus] = useState<BookingStatus | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTanggal, setEditTanggal] = useState('');
@@ -59,6 +62,19 @@ export default function BookingDetailModal({
   const [editKodeUnit, setEditKodeUnit] = useState('');
 
   const [fetchedUnits, setFetchedUnits] = useState<Unit[]>([]);
+
+  // Fungsi untuk memutar suara notifikasi saat pop-up member muncul
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.volume = 0.8;
+      audio.play().catch((err) => {
+        console.warn('Gagal memutar audio otomatis:', err);
+      });
+    } catch (e) {
+      console.error('Audio error:', e);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && (!units || units.length === 0) && fetchedUnits.length === 0) {
@@ -161,9 +177,22 @@ export default function BookingDetailModal({
 
   const handleStatusChange = async (
     newStatus: Booking['status_booking'],
-    statusBayar?: Booking['status_pembayaran']
+    statusBayar?: Booking['status_pembayaran'],
+    memberReminderConfirmed = false
   ) => {
     if (!onUpdateStatus) return;
+    if (
+      !memberReminderConfirmed &&
+      requireMemberOfferConfirmation &&
+      memberEligibility.isEligible &&
+      (newStatus === 'Active' || newStatus === 'Selesai')
+    ) {
+      playNotificationSound(); // Panggil suara notifikasi saat popup syarat member dipicu
+      setPendingMemberStatus(newStatus);
+      return;
+    }
+
+    setPendingMemberStatus(null);
     setIsUpdating(true);
     setErrorMessage(null);
     try {
@@ -473,6 +502,47 @@ export default function BookingDetailModal({
               </div>
             )}
           </>
+        )}
+
+        {pendingMemberStatus && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-sky-950/35 p-4 backdrop-blur-sm">
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="member-offer-title"
+              className="w-full max-w-sm rounded-3xl border border-white bg-linear-to-b from-sky-50 to-white p-5 text-sky-950 shadow-[0_24px_70px_-20px_rgba(14,165,233,0.5)]"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <Award className="h-5 w-5" />
+                </span>
+                <h3 id="member-offer-title" className="text-sm font-bold">
+                  Apakah sudah ditawarkan member?
+                </h3>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-sky-700">
+                Transaksi ini memenuhi syarat member {memberEligibility.category}. Pastikan penawaran member sudah disampaikan sebelum melanjutkan.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPendingMemberStatus(null)}
+                  disabled={isUpdating}
+                  className="rounded-full border border-sky-200 bg-white px-4 py-2 text-xs font-semibold text-sky-700 transition-all hover:bg-sky-50 disabled:opacity-50"
+                >
+                  Belum, kembali
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleStatusChange(pendingMemberStatus, undefined, true)}
+                  disabled={isUpdating}
+                  className="rounded-full bg-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(14,165,233,0.8)] transition-all hover:bg-sky-600 disabled:opacity-50"
+                >
+                  {isUpdating ? 'Memproses...' : 'Ya, lanjutkan'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

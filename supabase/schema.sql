@@ -90,13 +90,6 @@ ALTER TABLE public.bookings
     ADD CONSTRAINT bookings_sumber_booking_check
         CHECK (sumber_booking IN ('Booking', 'Walk-in'));
 
-ALTER TABLE public.bookings
-    ADD CONSTRAINT bookings_operator_kasir_check
-        CHECK (
-            operator_kasir IS NULL OR
-            operator_kasir IN ('Amar Waly', 'Indy', 'Mona', 'Rakel', 'Adit', 'Nida')
-        );
-
 CREATE INDEX IF NOT EXISTS idx_bookings_lookup
 ON public.bookings (tanggal_booking, kode_unit, status_booking);
 
@@ -131,9 +124,23 @@ BEGIN
     IF TG_OP = 'INSERT' AND NEW.operator_kasir IS NULL THEN
         RAISE EXCEPTION 'Operator kasir wajib dipilih.';
     END IF;
-    IF NEW.operator_kasir IS NOT NULL AND NEW.operator_kasir NOT IN
-       ('Amar Waly', 'Indy', 'Mona', 'Rakel', 'Adit', 'Nida') THEN
-        RAISE EXCEPTION 'Operator kasir tidak valid: %', NEW.operator_kasir;
+    IF TG_OP = 'INSERT' AND NOT EXISTS (
+        SELECT 1
+        FROM public.operators
+        WHERE kode_cabang = NEW.kode_cabang
+          AND nama_operator = NEW.operator_kasir
+    ) THEN
+        RAISE EXCEPTION 'Operator % tidak terdaftar pada cabang %.', NEW.operator_kasir, NEW.kode_cabang;
+    ELSIF TG_OP = 'UPDATE' AND (
+        NEW.operator_kasir IS DISTINCT FROM OLD.operator_kasir OR
+        NEW.kode_cabang IS DISTINCT FROM OLD.kode_cabang
+    ) AND NEW.operator_kasir IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM public.operators
+        WHERE kode_cabang = NEW.kode_cabang
+          AND nama_operator = NEW.operator_kasir
+    ) THEN
+        RAISE EXCEPTION 'Operator % tidak terdaftar pada cabang %.', NEW.operator_kasir, NEW.kode_cabang;
     END IF;
 
     v_operational_start := NEW.tanggal_booking +
@@ -315,3 +322,96 @@ WHERE kode_unit NOT IN (
     'VIP5-01', 'VIP5-02', 'REG-01', 'PS3-01', 'PS3-02', 'REG-04',
     'REG-05', 'REG-06', 'REG-07', 'REG-08', 'REG-09', 'REG-10'
 );
+
+-- ==============================================================================
+-- OWNER MASTER DATA MANAGEMENT (CABANG & PENGATURAN)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.cabang (
+    kode_cabang TEXT PRIMARY KEY,
+    nama_cabang TEXT NOT NULL,
+    alamat TEXT,
+    no_telepon TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    jam_buka_weekday TIME NOT NULL DEFAULT '10:00',
+    jam_buka_weekend TIME NOT NULL DEFAULT '09:00',
+    jam_tutup TIME NOT NULL DEFAULT '02:00',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO public.cabang (kode_cabang, nama_cabang, alamat, no_telepon, is_active, jam_buka_weekday, jam_buka_weekend, jam_tutup)
+VALUES ('CBG-01', 'Akiba Core Pusat', 'Lantai 1-3, Pusat Rental Akiba Core', '081234567890', true, '10:00', '09:00', '02:00')
+ON CONFLICT (kode_cabang) DO NOTHING;
+
+ALTER TABLE public.cabang ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view active cabang" ON public.cabang;
+CREATE POLICY "Public can view active cabang"
+ON public.cabang FOR SELECT
+TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "Staff can manage cabang" ON public.cabang;
+CREATE POLICY "Staff can manage cabang"
+ON public.cabang FOR ALL
+TO anon, authenticated
+USING (true)
+WITH CHECK (true);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND tablename = 'cabang'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.cabang;
+    END IF;
+END $$;
+
+-- ==============================================================================
+-- OWNER OPERATOR MANAGEMENT
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.operators (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kode_cabang TEXT NOT NULL REFERENCES public.cabang(kode_cabang) ON UPDATE CASCADE ON DELETE CASCADE,
+    nama_operator TEXT NOT NULL CHECK (length(trim(nama_operator)) > 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT operators_branch_name_unique UNIQUE (kode_cabang, nama_operator)
+);
+
+INSERT INTO public.operators (kode_cabang, nama_operator)
+VALUES
+    ('CBG-01', 'Amar Waly'),
+    ('CBG-01', 'Indy'),
+    ('CBG-01', 'Mona'),
+    ('CBG-01', 'Rakel'),
+    ('CBG-01', 'Adit'),
+    ('CBG-01', 'Nida')
+ON CONFLICT (kode_cabang, nama_operator) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_operators_branch_name
+ON public.operators (kode_cabang, nama_operator);
+
+ALTER TABLE public.operators ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view operators" ON public.operators;
+CREATE POLICY "Public can view operators"
+ON public.operators FOR SELECT
+TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "Staff can manage operators" ON public.operators;
+CREATE POLICY "Staff can manage operators"
+ON public.operators FOR ALL
+TO anon, authenticated
+USING (true)
+WITH CHECK (true);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND tablename = 'operators'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.operators;
+    END IF;
+END $$;

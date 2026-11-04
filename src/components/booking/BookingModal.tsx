@@ -7,7 +7,6 @@ import {
   BookingStatusPembayaran,
   BookingSumber,
   CashierOperator,
-  CASHIER_OPERATORS,
 } from '@/types/database';
 import { formatRupiah, addHoursToTime, formatTimeShort, getOperationalStartHour } from '@/lib/utils';
 import { checkMemberEligibility } from '@/lib/memberEligibility';
@@ -17,6 +16,7 @@ interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   units: Unit[];
+  operators: string[];
   initialUnit?: Unit | null;
   initialTime?: string;
   selectedDate: string;
@@ -27,6 +27,7 @@ export default function BookingModal({
   isOpen,
   onClose,
   units,
+  operators,
   initialUnit,
   initialTime = '10:00',
   selectedDate,
@@ -35,6 +36,7 @@ export default function BookingModal({
   const [selectedUnitCode, setSelectedUnitCode] = useState(
     initialUnit?.kode_unit || units[0]?.kode_unit || ''
   );
+  const [bookingDate, setBookingDate] = useState(selectedDate);
   const [jamMulai, setJamMulai] = useState(initialTime);
   const [durasi, setDurasi] = useState(2);
   const [nama, setNama] = useState('');
@@ -80,7 +82,7 @@ export default function BookingModal({
     try {
       const result = await onSubmit({
         kode_unit: selectedUnitCode,
-        tanggal_booking: selectedDate,
+        tanggal_booking: bookingDate,
         jam_mulai: jamMulai,
         durasi_efektif: durasi,
         nama_pelanggan: nama.trim(),
@@ -146,6 +148,18 @@ export default function BookingModal({
         )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div className="max-w-xs">
+            <label className={labelClass} htmlFor="booking-date">Tanggal Booking</label>
+            <input
+              id="booking-date"
+              type="date"
+              value={bookingDate}
+              onChange={(event) => setBookingDate(event.target.value)}
+              className={`${fieldClass} font-mono`}
+              required
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className={labelClass} htmlFor="booking-unit">Unit / Room</label>
@@ -162,7 +176,7 @@ export default function BookingModal({
               <label className={labelClass} htmlFor="booking-time"><Clock className={iconClass} />Jam Mulai</label>
               <input id="booking-time" type="time" value={jamMulai} step="1800" onChange={(event) => setJamMulai(event.target.value)} className={`${fieldClass} font-mono`} required />
               <span className="mt-1 block text-[11px] text-sky-600/70">
-                Buka {String(getOperationalStartHour(selectedDate)).padStart(2, '0')}:00–02:00
+                Buka {String(getOperationalStartHour(bookingDate)).padStart(2, '0')}:00–02:00
               </span>
             </div>
             <div>
@@ -197,9 +211,9 @@ export default function BookingModal({
             </div>
             <div>
               <label className={labelClass} htmlFor="booking-operator">Operator Kasir <span className="text-rose-500">*</span></label>
-              <select id="booking-operator" value={operator} onChange={(event) => setOperator(event.target.value as CashierOperator | '')} className={fieldClass} required>
+              <select id="booking-operator" value={operator} onChange={(event) => setOperator(event.target.value)} className={fieldClass} required>
                 <option value="">Pilih operator kasir</option>
-                {CASHIER_OPERATORS.map((name) => <option key={name} value={name}>{name}</option>)}
+                {operators.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </div>
           </div>

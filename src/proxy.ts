@@ -9,7 +9,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  if (pathname.startsWith('/analytics') && role !== 'owner') {
+  if ((pathname.startsWith('/analytics') || pathname.startsWith('/owner')) && role !== 'owner') {
     return NextResponse.redirect(new URL('/kasir', request.url));
   }
 
@@ -17,5 +17,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/kasir/:path*', '/analytics/:path*'],
+  matcher: ['/kasir/:path*', '/analytics/:path*', '/owner/:path*'],
 };

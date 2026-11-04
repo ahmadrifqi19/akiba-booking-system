@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useBookingData } from '@/hooks/useBookingData';
 import Navbar from '@/components/layout/Navbar';
 import DateNavigationBar from '@/components/booking/DateNavigationBar';
@@ -20,6 +21,25 @@ import {
 } from 'lucide-react';
 
 export default function KasirPOSPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-full w-full items-center justify-center bg-linear-to-b from-sky-50/40 to-white">
+          <div className="h-7 w-7 animate-spin rounded-full border-3 border-sky-200 border-t-sky-500" />
+        </div>
+      }
+    >
+      <KasirPOSContent />
+    </Suspense>
+  );
+}
+
+function KasirPOSContent() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const branchCode = searchParams.get('cabang') || 'CBG-01';
+
   // Inisialisasi state tanggal dengan fallback tanggal statis agar aman dari prerender SSR
   const [selectedDate, setSelectedDate] = useState<string>('2026-10-23');
 
@@ -45,11 +65,23 @@ export default function KasirPOSPage() {
 
   const {
     units,
+    branches,
+    operators,
     bookings,
+    dataError,
     isLoading,
     createBooking,
     updateBookingStatus,
-  } = useBookingData(selectedDate);
+  } = useBookingData(selectedDate, { branchCode });
+
+  const handleBranchChange = (nextBranchCode: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('cabang', nextBranchCode);
+    setIsBookingModalOpen(false);
+    setSelectedSlotUnit(null);
+    setSelectedBookingForDetail(null);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   // Metrics for today
   const activeBookings = bookings.filter((b) => b.status_booking === 'Active');
@@ -122,7 +154,24 @@ export default function KasirPOSPage() {
           </div>
 
           {/* Quick Action Button */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <label className="sr-only" htmlFor="kasir-branch">
+              Pilih cabang
+            </label>
+            <select
+              id="kasir-branch"
+              value={branchCode}
+              onChange={(event) => handleBranchChange(event.target.value)}
+              disabled={isLoading || branches.length === 0}
+              className="w-full rounded-2xl border border-sky-200 bg-white px-3 py-2.5 text-xs font-bold text-sky-800 shadow-2xs outline-none transition hover:bg-sky-50 focus:border-sky-400 sm:w-auto"
+            >
+              {branches.length === 0 && <option value={branchCode}>{branchCode}</option>}
+              {branches.map((branch) => (
+                <option key={branch.kode_cabang} value={branch.kode_cabang}>
+                  {branch.kode_cabang} · {branch.nama_cabang}
+                </option>
+              ))}
+            </select>
             <button
               onClick={() => {
                 setSelectedSlotUnit(units[0] || null);
@@ -198,7 +247,11 @@ export default function KasirPOSPage() {
         <StatusLegend />
 
         {/* Interactive Timeline Grid */}
-        {isLoading ? (
+        {dataError ? (
+          <div role="alert" className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">
+            {dataError}
+          </div>
+        ) : isLoading ? (
           <div className="flex h-96 flex-col items-center justify-center gap-2.5 rounded-3xl border border-sky-100 bg-white shadow-[0_12px_40px_-20px_rgba(14,165,233,0.35)]">
             <div className="h-7 w-7 border-3 border-sky-200 border-t-sky-500 rounded-full animate-spin" />
             <span className="text-xs text-sky-600 font-medium">Memuat grid interaktif...</span>
@@ -221,6 +274,7 @@ export default function KasirPOSPage() {
           isOpen={isBookingModalOpen}
           onClose={() => setIsBookingModalOpen(false)}
           units={units}
+          operators={operators}
           initialUnit={selectedSlotUnit}
           initialTime={selectedSlotTime}
           selectedDate={selectedDate}
@@ -234,6 +288,7 @@ export default function KasirPOSPage() {
         isOpen={Boolean(selectedBookingForDetail)}
         onClose={() => setSelectedBookingForDetail(null)}
         isKasirMode={true}
+        requireMemberOfferConfirmation
         onUpdateStatus={async (id, status, statusBayar) => {
           const res = await updateBookingStatus(id, status, statusBayar);
           if (res.success) {

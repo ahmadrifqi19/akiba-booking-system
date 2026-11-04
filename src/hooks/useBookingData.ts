@@ -8,6 +8,8 @@ import {
   Booking,
   BookingFormData,
   BookingSchedule,
+  Cabang,
+  Operator,
   Database,
 } from '@/types/database';
 import {
@@ -16,6 +18,8 @@ import {
   getOperationalStartHour,
 } from '@/lib/utils';
 
+const DEFAULT_BRANCH_CODE = 'CBG-01';
+
 export function useBookingData<TPublic extends boolean = false>(
   selectedDate?: string,
   options?: {
@@ -23,6 +27,7 @@ export function useBookingData<TPublic extends boolean = false>(
     allDates?: boolean;
     startDate?: string;
     endDate?: string;
+    branchCode?: string;
   }
 ) {
   const queryClient = useQueryClient();
@@ -30,14 +35,40 @@ export function useBookingData<TPublic extends boolean = false>(
   const isConfigured = isSupabaseConfigured();
   const publicOnly = options?.publicOnly ?? false;
   const isAllDates = options?.allDates ?? false;
+  const selectedBranchCode = options?.branchCode || DEFAULT_BRANCH_CODE;
   type VisibleBooking = TPublic extends true ? BookingSchedule : Booking;
 
-  // 1. Fetch Units
-  const unitsQuery = useQuery<Unit[]>({
-    queryKey: ['units'],
+  const branchesQuery = useQuery<Cabang[]>({
+    queryKey: ['branches'],
     queryFn: async () => {
       if (!isConfigured) {
-        console.error('Supabase belum dikonfigurasi. Data unit tidak dapat dimuat.');
+        console.error('Supabase belum dikonfigurasi. Data cabang tidak dapat dimuat.');
+        throw new Error('Supabase belum dikonfigurasi. Data cabang tidak dapat dimuat.');
+      }
+
+      const supabase = createClient<Database>();
+      const { data, error } = await supabase
+        .from('cabang')
+        .select('*')
+        .eq('is_active', true)
+        .order('kode_cabang', { ascending: true });
+
+      if (error) {
+        throw new Error(`Gagal memuat daftar cabang dari Supabase: ${error.message}`);
+      }
+      return data ?? [];
+    },
+    enabled: isConfigured,
+    staleTime: 1000 * 60,
+  });
+  const branches = branchesQuery.data ?? [];
+  const activeBranch = branches.find((branch) => branch.kode_cabang === selectedBranchCode);
+
+  // 1. Fetch Units for the active branch
+  const unitsQuery = useQuery<Unit[]>({
+    queryKey: ['units', selectedBranchCode],
+    queryFn: async () => {
+      if (!isConfigured || !activeBranch) {
         return [];
       }
 
@@ -46,21 +77,43 @@ export function useBookingData<TPublic extends boolean = false>(
         .from('units')
         .select('*')
         .eq('is_active', true)
+        .eq('kode_cabang', selectedBranchCode)
         .order('urutan', { ascending: true });
 
       if (error) {
-        console.error('Gagal memuat unit dari Supabase:', error.message || JSON.stringify(error));
-        return [];
+        throw new Error(`Gagal memuat unit dari Supabase: ${error.message}`);
       }
       return data ?? [];
     },
+    enabled: isConfigured && Boolean(activeBranch),
     staleTime: 1000 * 60 * 10,
+  });
+
+  const operatorsQuery = useQuery<Operator[]>({
+    queryKey: ['operators', selectedBranchCode],
+    queryFn: async () => {
+      if (!isConfigured || !activeBranch) return [];
+      const supabase = createClient<Database>();
+      const { data, error } = await supabase
+        .from('operators')
+        .select('*')
+        .eq('kode_cabang', selectedBranchCode)
+        .order('nama_operator', { ascending: true });
+
+      if (error) {
+        throw new Error(`Gagal memuat operator dari Supabase: ${error.message}`);
+      }
+      return data ?? [];
+    },
+    enabled: isConfigured && Boolean(activeBranch),
+    staleTime: 1000 * 60,
   });
 
   // 2. Fetch Bookings for Selected Date or All Dates
   const bookingsQuery = useQuery<VisibleBooking[]>({
     queryKey: [
       'bookings',
+      selectedBranchCode,
       isAllDates ? 'all' : (selectedDate ?? 'all'),
       publicOnly ? 'public' : 'staff',
     ],
@@ -69,6 +122,7 @@ export function useBookingData<TPublic extends boolean = false>(
         console.error('Supabase belum dikonfigurasi. Data booking tidak dapat dimuat.');
         return [];
       }
+      if (!activeBranch) return [];
 
       const supabase = createClient<Database>();
       let query = publicOnly
@@ -88,15 +142,16 @@ export function useBookingData<TPublic extends boolean = false>(
       }
 
       const result = await query
+        .eq('kode_cabang', selectedBranchCode)
         .order('tanggal_booking', { ascending: false })
         .order('jam_mulai', { ascending: true });
 
       if (result.error) {
-        console.error('Gagal memuat booking dari Supabase:', result.error.message || JSON.stringify(result.error));
-        return [];
+        throw new Error(`Gagal memuat booking dari Supabase: ${result.error.message}`);
       }
       return (result.data ?? []) as VisibleBooking[];
     },
+    enabled: isConfigured && Boolean(activeBranch),
     staleTime: 1000 * 15,
   });
 
@@ -108,8 +163,8 @@ export function useBookingData<TPublic extends boolean = false>(
 
     const supabase = createClient<Database>();
     const channelName = isAllDates
-      ? 'public:bookings:all'
-      : `public:bookings:${selectedDate || 'all'}`;
+      ? `public:bookings:${selectedBranchCode}:all`
+      : `public:bookings:${selectedBranchCode}:${selectedDate || 'all'}`;
 
     const channel = supabase
       .channel(channelName)
@@ -118,10 +173,49 @@ export function useBookingData<TPublic extends boolean = false>(
         {
           event: '*',
           schema: 'public',
-          table: 'bookings',
+          table: 'units',
+          filter: `kode_cabang=eq.${selectedBranchCode}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['bookings'] });
+          void queryClient.invalidateQueries({ queryKey: ['units'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'operators',
+          filter: `kode_cabang=eq.${selectedBranchCode}`,
+        },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ['operators', selectedBranchCode] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cabang',
+          filter: `kode_cabang=eq.${selectedBranchCode}`,
+        },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ['branches'] });
+          void queryClient.invalidateQueries({ queryKey: ['units'] });
+          void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `kode_cabang=eq.${selectedBranchCode}`,
+        },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ['bookings'] });
         }
       )
       .subscribe((status) => {
@@ -131,7 +225,7 @@ export function useBookingData<TPublic extends boolean = false>(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedDate, isAllDates, queryClient, isConfigured]);
+  }, [selectedDate, isAllDates, queryClient, isConfigured, selectedBranchCode]);
 
   // 4. Create Booking Handler
   const createBooking = useCallback(
@@ -161,11 +255,25 @@ export function useBookingData<TPublic extends boolean = false>(
         };
       }
 
-      // Check conflict client-side
-      const currentBookings = bookingsQuery.data || [];
-      const hasConflict = currentBookings.some((b) => {
-        if (b.kode_unit !== formData.kode_unit) return false;
-        if (b.status_booking === 'Batal') return false;
+      const supabase = createClient<Database>();
+      if (!activeBranch) {
+        return { success: false, error: 'Cabang aktif tidak ditemukan atau tidak aktif di Supabase.' };
+      }
+
+      const { data: currentBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id,kode_unit,tanggal_booking,jam_mulai,durasi_efektif,status_booking')
+        .eq('kode_cabang', selectedBranchCode)
+        .eq('tanggal_booking', formData.tanggal_booking)
+        .eq('kode_unit', formData.kode_unit)
+        .neq('status_booking', 'Batal');
+
+      if (bookingsError) {
+        console.error('Gagal memeriksa jadwal booking di Supabase:', bookingsError.message);
+        return { success: false, error: `Gagal memeriksa jadwal booking: ${bookingsError.message}` };
+      }
+
+      const hasConflict = (currentBookings ?? []).some((b) => {
         const existingStart = getOperationalBookingStart(b.jam_mulai, formData.tanggal_booking);
         const existingEnd = existingStart + b.durasi_efektif * 60;
         return bookingStart < existingEnd && bookingEnd > existingStart;
@@ -180,10 +288,9 @@ export function useBookingData<TPublic extends boolean = false>(
 
       const formattedJamMulai = formData.jam_mulai.length === 5 ? `${formData.jam_mulai}:00` : formData.jam_mulai;
 
-      const supabase = createClient<Database>();
       const insertPayload: Database['public']['Tables']['bookings']['Insert'] = {
         timestamp_input: new Date().toISOString(),
-        kode_cabang: 'CBG-01',
+        kode_cabang: selectedBranchCode,
         tanggal_booking: formData.tanggal_booking,
         jam_mulai: formattedJamMulai,
         jam_selesai,
@@ -214,7 +321,7 @@ export function useBookingData<TPublic extends boolean = false>(
       await queryClient.invalidateQueries({ queryKey: ['bookings'] });
       return { success: true, booking: data as Booking };
     },
-    [unitsQuery.data, bookingsQuery.data, isConfigured, queryClient]
+    [unitsQuery.data, activeBranch, selectedBranchCode, isConfigured, queryClient]
   );
 
   // 5. Update Status Booking Handler
@@ -252,8 +359,17 @@ export function useBookingData<TPublic extends boolean = false>(
 
   return {
     units: unitsQuery.data ?? [],
+    operators: (operatorsQuery.data ?? []).map((operator) => operator.nama_operator),
+    branches,
     bookings: bookingsQuery.data ?? [],
-    isLoading: unitsQuery.isLoading || bookingsQuery.isLoading,
+    dataError: [branchesQuery.error, unitsQuery.error, operatorsQuery.error, bookingsQuery.error].find(
+      (error): error is Error => error instanceof Error
+    )?.message ?? (branchesQuery.isSuccess && !activeBranch
+      ? `Cabang ${selectedBranchCode} tidak ditemukan atau tidak aktif di Supabase.`
+      : !isConfigured
+        ? 'Supabase belum dikonfigurasi.'
+        : null),
+    isLoading: branchesQuery.isLoading || unitsQuery.isLoading || bookingsQuery.isLoading,
     isRealtimeActive,
     isSupabaseConfigured: isConfigured,
     createBooking,

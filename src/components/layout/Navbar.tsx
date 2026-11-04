@@ -4,9 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, BarChart3, LogOut } from 'lucide-react';
+import { ShoppingCart, BarChart3, LogOut, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/lib/auth/session';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar({ role }: { role: UserRole }) {
   const pathname = usePathname();
@@ -25,7 +26,12 @@ export default function Navbar({ role }: { role: UserRole }) {
       label: 'Analytics',
       icon: BarChart3,
     },
-  ].filter((item) => role === 'owner' || item.href !== '/analytics');
+    {
+      href: '/owner',
+      label: 'Master Data',
+      icon: SlidersHorizontal,
+    },
+  ].filter((item) => role === 'owner' || item.href === '/kasir');
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -75,6 +81,7 @@ export default function Navbar({ role }: { role: UserRole }) {
         {/* User Actions & Logout di Pojok Kanan */}
         <div className="flex items-center gap-2">
           {logoutError && <span role="alert" className="hidden text-xs text-rose-600 sm:inline">{logoutError}</span>}
+          <ThemeToggle compact />
           <div className="hidden flex-col items-end text-right sm:flex">
             <span className="text-xs font-bold text-sky-950">{role === 'owner' ? 'Owner' : 'Kasir'}</span>
             <span className="text-[10px] font-bold text-sky-500">Cabang CBG-01</span>

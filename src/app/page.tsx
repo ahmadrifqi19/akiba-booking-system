@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { Suspense, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useBookingData } from '@/hooks/useBookingData';
 import { getOperationalStartHour, getTodayDateString } from '@/lib/utils';
 import { supabase } from '@/lib/client';
@@ -10,15 +10,49 @@ import StatusLegend from '@/components/booking/StatusLegend';
 import TimelineGrid from '@/components/booking/TimelineGrid';
 import BookingDetailModal from '@/components/booking/BookingDetailModal';
 import WeeklyMatrixModal from '@/components/booking/WeeklyMatrixModal';
-import { BookingSchedule, Booking } from '@/types/database';
-import { Radio, RefreshCw, SlidersHorizontal, Gamepad2, ArrowRight } from 'lucide-react';
+import { BookingSchedule, Booking, Unit } from '@/types/database';
+import { Radio, RefreshCw, SlidersHorizontal, Gamepad2, ArrowRight, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ThemeToggle from '@/components/layout/ThemeToggle';
 
-// Daftar opsi kategori filter cepat
-const FILTER_OPTIONS = ['Semua', 'Smoking', 'Non Smoking', 'PS5', 'PS4', 'VVIP', 'VIP', 'Reguler'];
+const FILTER_CATEGORIES = ['Smoking', 'Non Smoking', 'PS5', 'PS4', 'VVIP', 'VIP', 'Reguler'];
 
-export default function CustomerDisplayPage() {
+function unitMatchesFilter(unit: Unit, filter: string) {
+  const kelas = unit.kelas?.toUpperCase() || '';
+  const zona = unit.preferensi_zona?.toUpperCase() || '';
+  const target = filter.toUpperCase();
+
+  if (target === 'SMOKING') {
+    return (kelas.includes('SMOKING') || zona.includes('SMOKING')) &&
+      !(kelas.includes('NON') || zona.includes('NON') || kelas.includes('NON-SMOKING'));
+  }
+
+  if (target === 'NON SMOKING') {
+    return kelas.includes('NON') || zona.includes('NON') || kelas.includes('NON-SMOKING');
+  }
+
+  return kelas.includes(target) || zona.includes(target);
+}
+
+export default function CustomerDisplayPage({ showBranchSwitcher = true }: { showBranchSwitcher?: boolean }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-full w-full items-center justify-center bg-linear-to-b from-sky-50/40 to-white">
+          <div className="h-7 w-7 animate-spin rounded-full border-3 border-sky-200 border-t-sky-500" />
+        </div>
+      }
+    >
+      <CustomerDisplayContent showBranchSwitcher={showBranchSwitcher} />
+    </Suspense>
+  );
+}
+
+function CustomerDisplayContent({ showBranchSwitcher }: { showBranchSwitcher: boolean }) {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
+  const branchCode = searchParams.get('cabang') || 'CBG-01';
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [activeBookingModal, setActiveBookingModal] = useState<BookingSchedule | null>(null);
 
@@ -27,12 +61,27 @@ export default function CustomerDisplayPage() {
 
   const {
     units,
+    branches,
     bookings,
+    dataError,
     isLoading,
     isRealtimeActive,
     isSupabaseConfigured,
     refetch,
-  } = useBookingData(selectedDate, { publicOnly: true });
+  } = useBookingData(selectedDate, { publicOnly: true, branchCode });
+  const activeBranch = branches.find((branch) => branch.kode_cabang === branchCode);
+  const availableFilters = useMemo(
+    () => ['Semua', ...FILTER_CATEGORIES.filter((filter) => units.some((unit) => unitMatchesFilter(unit, filter)))],
+    [units]
+  );
+  const activeFilter = availableFilters.includes(selectedFilter) ? selectedFilter : 'Semua';
+
+  const handleBranchChange = (nextBranchCode: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('cabang', nextBranchCode);
+    setActiveBookingModal(null);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   // Fungsi penanganan update status booking secara real-time
   const handleUpdateBookingStatus = async (
@@ -69,29 +118,9 @@ export default function CustomerDisplayPage() {
     }
   };
 
-  // Logika penyaringan unit berdasarkan filter yang dipilih secara presisi
-  const filteredUnits = units.filter((unit) => {
-    if (selectedFilter === 'Semua') return true;
-
-    const kelas = unit.kelas?.toUpperCase() || '';
-    const zona = unit.preferensi_zona?.toUpperCase() || '';
-    const target = selectedFilter.toUpperCase();
-
-    if (target === 'SMOKING') {
-      const isActuallySmoking = (kelas.includes('SMOKING') || zona.includes('SMOKING')) &&
-                                !(kelas.includes('NON') || zona.includes('NON') || kelas.includes('NON-SMOKING'));
-      return isActuallySmoking;
-    }
-
-    if (target === 'NON SMOKING') {
-      return kelas.includes('NON') || zona.includes('NON') || kelas.includes('NON-SMOKING');
-    }
-
-    const kelasMatch = kelas.includes(target);
-    const zonaMatch = zona.includes(target);
-
-    return kelasMatch || zonaMatch;
-  });
+  const filteredUnits = activeFilter === 'Semua'
+    ? units
+    : units.filter((unit) => unitMatchesFilter(unit, activeFilter));
 
   const operationalHours = `${String(getOperationalStartHour(selectedDate)).padStart(2, '0')}:00 - 02:00`;
 
@@ -117,9 +146,34 @@ export default function CustomerDisplayPage() {
             <p className="text-xs sm:text-sm text-sky-700/80">
               Pantau jadwal ketersediaan room secara live ({operationalHours}).
             </p>
+            <p className="flex items-center gap-1 text-[11px] font-medium text-sky-600">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <span>{activeBranch?.alamat?.trim() || 'Alamat cabang belum diatur'}</span>
+            </p>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+            {showBranchSwitcher && (
+              <>
+                <label className="sr-only" htmlFor="display-branch">
+                  Pilih cabang
+                </label>
+                <select
+                  id="display-branch"
+                  value={branchCode}
+                  onChange={(event) => handleBranchChange(event.target.value)}
+                  disabled={isLoading || branches.length === 0}
+                  className="max-w-44 rounded-2xl border border-sky-100 bg-white px-3 py-2.5 text-xs font-semibold text-sky-900 shadow-2xs outline-none transition hover:bg-sky-50 focus:border-sky-400"
+                >
+                  {branches.length === 0 && <option value={branchCode}>{branchCode}</option>}
+                  {branches.map((branch) => (
+                    <option key={branch.kode_cabang} value={branch.kode_cabang}>
+                      {branch.kode_cabang} · {branch.nama_cabang}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white border border-sky-100 text-xs shadow-2xs">
               <Radio
                 className={`h-3.5 w-3.5 ${
@@ -144,6 +198,7 @@ export default function CustomerDisplayPage() {
             >
               <RefreshCw className="h-4 w-4" />
             </button>
+            <ThemeToggle compact />
           </div>
         </div>
 
@@ -166,8 +221,8 @@ export default function CustomerDisplayPage() {
             <SlidersHorizontal className="h-3.5 w-3.5 text-sky-500" />
             <span className="hidden sm:inline">Filter:</span>
           </div>
-          {FILTER_OPTIONS.map((filter) => {
-            const isActive = selectedFilter === filter;
+          {availableFilters.map((filter) => {
+            const isActive = activeFilter === filter;
             return (
               <button
                 key={filter}
@@ -187,7 +242,11 @@ export default function CustomerDisplayPage() {
         </div>
 
         {/* Visual Timeline Grid dengan Data Ter-filter */}
-        {isLoading ? (
+        {dataError ? (
+          <div role="alert" className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">
+            {dataError}
+          </div>
+        ) : isLoading ? (
           <div className="flex h-96 flex-col items-center justify-center gap-2.5 rounded-3xl border border-sky-100 bg-white shadow-[0_12px_40px_-20px_rgba(14,165,233,0.35)]">
             <div className="h-7 w-7 border-3 border-sky-200 border-t-sky-500 rounded-full animate-spin" />
             <span className="text-xs text-sky-600 font-medium">Memuat jadwal visual unit...</span>

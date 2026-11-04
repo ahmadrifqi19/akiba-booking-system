@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useBookingData } from '@/hooks/useBookingData';
 import Navbar from '@/components/layout/Navbar';
 import { getTodayDateString } from '@/lib/utils';
-import { INITIAL_UNITS, getInitialBookings } from '@/lib/mockData';
 import {
   Clock,
   Download,
@@ -31,6 +30,7 @@ export default function AnalyticsPage() {
   const [rangeType, setRangeType] = useState<'today' | 'week' | 'month' | 'custom' | 'all'>('today');
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
+  const [selectedBranchCode, setSelectedBranchCode] = useState('CBG-01');
 
   // State baru untuk filter status booking
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -43,13 +43,14 @@ export default function AnalyticsPage() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const { bookings, isLoading } = useBookingData(todayStr, { allDates: true });
+  const { bookings, branches, dataError, isLoading } = useBookingData(todayStr, {
+    allDates: true,
+    branchCode: selectedBranchCode,
+  });
 
   // Filter Data berdasarkan Rentang Tanggal, Sumber Booking, dan Status Booking
   const filteredBookings = useMemo(() => {
-    const baseList = (bookings.length > 0 ? bookings : getInitialBookings()).filter(
-      (b) => b.sumber_booking === 'Booking'
-    );
+    const baseList = bookings.filter((b) => b.sumber_booking === 'Booking');
 
     // Filter berdasarkan rentang tanggal terlebih dahulu
     const dateFiltered = baseList.filter((b) => {
@@ -155,7 +156,7 @@ export default function AnalyticsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `AkibaCore_Laporan_${todayStr}.csv`);
+    link.setAttribute('download', `AkibaCore_Laporan_${selectedBranchCode}_${todayStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -200,6 +201,25 @@ export default function AnalyticsPage() {
           {/* Action Controls & Filters */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto flex-wrap">
 
+            <div className="flex items-center gap-1.5 rounded-2xl border border-sky-200 bg-white px-3 py-1.5 text-xs text-sky-900 shadow-2xs">
+              <span className="shrink-0 font-semibold text-sky-600">Cabang</span>
+              <select
+                aria-label="Filter cabang"
+                value={selectedBranchCode}
+                onChange={(event) => setSelectedBranchCode(event.target.value)}
+                className="max-w-44 bg-transparent font-bold text-sky-900 focus:outline-hidden cursor-pointer"
+              >
+                {!branches.some((branch) => branch.kode_cabang === selectedBranchCode) && (
+                  <option value={selectedBranchCode}>{selectedBranchCode}</option>
+                )}
+                {branches.map((branch) => (
+                  <option key={branch.kode_cabang} value={branch.kode_cabang}>
+                    {branch.kode_cabang} · {branch.nama_cabang}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Dropdown Filter Status Booking */}
             <div className="flex items-center gap-1.5 rounded-2xl border border-sky-200 bg-white px-3 py-1.5 text-xs text-sky-900 shadow-2xs">
               <Filter className="h-3.5 w-3.5 text-sky-500 shrink-0" />
@@ -215,6 +235,12 @@ export default function AnalyticsPage() {
                 <option value="Batal">Batal</option>
               </select>
             </div>
+
+            {dataError && (
+              <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {dataError}
+              </div>
+            )}
 
             {/* Quick Filter Buttons */}
             <div className="flex items-center gap-0.5 rounded-2xl border border-sky-200 bg-sky-100/60 p-1 text-xs font-bold">

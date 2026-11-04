@@ -1,7 +1,4 @@
-import { Unit, Booking, CashierOperator } from '@/types/database';
-import { getTodayDateString } from './utils';
-
-const SAMPLE_OPERATORS: CashierOperator[] = ['Amar Waly', 'Indy', 'Mona', 'Rakel', 'Adit', 'Nida'];
+import { Unit, Booking } from '@/types/database';
 
 const UNIT_DATA = [
   ['VVIP5-01', 'VVIP PS5', 'Smoking | Lt 2', 35000],
