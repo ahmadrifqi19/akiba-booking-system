@@ -4,7 +4,6 @@ import React, { useMemo, useState } from 'react';
 import {
   Unit,
   BookingFormData,
-  BookingStatusPembayaran,
   BookingSumber,
   CashierOperator,
 } from '@/types/database';
@@ -43,7 +42,6 @@ export default function BookingModal({
   const [whatsapp, setWhatsapp] = useState('');
   const [source, setSource] = useState<BookingSumber>('Booking');
   const [operator, setOperator] = useState<CashierOperator | ''>('');
-  const [statusBayar, setStatusBayar] = useState<BookingStatusPembayaran>('Belum Bayar');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -87,7 +85,6 @@ export default function BookingModal({
         durasi_efektif: durasi,
         nama_pelanggan: nama.trim(),
         no_whatsapp: whatsapp.trim(),
-        status_pembayaran: statusBayar,
         status_booking: 'Terkonfirmasi',
         sumber_booking: source,
         operator_kasir: operator,
@@ -104,7 +101,6 @@ export default function BookingModal({
       setWhatsapp('');
       setSource('Booking');
       setOperator('');
-      setStatusBayar('Belum Bayar');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan booking.');
     } finally {

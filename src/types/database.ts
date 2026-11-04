@@ -94,7 +94,7 @@ export interface BookingFormData {
   durasi_efektif: number;
   nama_pelanggan: string;
   no_whatsapp: string;
-  status_pembayaran: BookingStatusPembayaran;
+  status_pembayaran?: string;
   status_booking: BookingStatus;
   sumber_booking: BookingSumber;
   operator_kasir: CashierOperator;

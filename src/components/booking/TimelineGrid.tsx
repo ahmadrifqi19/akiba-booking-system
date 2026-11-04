@@ -205,10 +205,6 @@ export default function TimelineGrid<TBooking extends BookingSchedule>({
                                 {`${formatTimeShort(activeBooking.jam_mulai)} - ${formatTimeShort(activeBooking.jam_selesai)}`}
                               </span>
                             </div>
-
-                            {isKasirMode && (
-                              <span className="text-[9px] font-medium">{getPaymentStatus(activeBooking)}</span>
-                            )}
                           </button>
                         );
                       }
@@ -421,11 +417,6 @@ export default function TimelineGrid<TBooking extends BookingSchedule>({
                                     {`${formatTimeShort(activeBooking.jam_mulai)} - ${formatTimeShort(activeBooking.jam_selesai)}`}
                                   </span>
                                 </div>
-                                {isKasirMode && (
-                                  <span className="text-[10px] font-semibold opacity-85">
-                                    {getPaymentStatus(activeBooking)}
-                                  </span>
-                                )}
                               </div>
                             </div>
                           </td>
@@ -465,10 +456,4 @@ export default function TimelineGrid<TBooking extends BookingSchedule>({
       </div>
     </div>
   );
-}
-
-function getPaymentStatus(booking: BookingSchedule): string {
-  return 'status_pembayaran' in booking && typeof booking.status_pembayaran === 'string'
-    ? booking.status_pembayaran
-    : '';
 }
