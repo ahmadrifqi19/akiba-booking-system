@@ -55,8 +55,8 @@ function NavbarContent({ role }: { role: UserRole }) {
   };
 
   return (
-    <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6">
-      <nav className="flex items-center gap-1 rounded-2xl border border-sky-200 bg-sky-100/60 p-1 sm:gap-1.5">
+    <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:px-6">
+      <nav className="flex shrink-0 items-center gap-1 rounded-2xl border border-sky-200 bg-sky-100/60 p-1 sm:gap-1.5">
         {navLinks.map((item) => {
           const Icon = item.icon;
           const hrefWithCabang = `${item.href}?cabang=${activeCabang}`;
@@ -66,22 +66,22 @@ function NavbarContent({ role }: { role: UserRole }) {
             <Link
               key={item.href}
               href={hrefWithCabang}
+              aria-label={item.label}
               className={cn(
-                'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150',
+                'flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all duration-150 sm:px-3.5 sm:text-sm',
                 isActive
                   ? 'bg-sky-500 text-white shadow-[0_4px_12px_-4px_rgba(14,165,233,0.7)] font-bold'
                   : 'text-sky-800 hover:text-sky-950 hover:bg-white/80'
               )}
             >
-              <Icon className={cn('h-4 w-4', isActive ? 'text-white' : 'text-sky-500')} />
-              <span className="hidden md:inline">{item.label}</span>
-              <span className="md:hidden">{item.label.split(' ')[0]}</span>
+            <Icon className={cn('h-4 w-4', isActive ? 'text-white' : 'text-sky-500')} />
+            <span className="hidden md:inline">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
         {logoutError && <span role="alert" className="hidden text-xs text-rose-600 sm:inline">{logoutError}</span>}
         <ThemeToggle compact />
         <div className="hidden flex-col items-end text-right sm:flex">
@@ -92,7 +92,7 @@ function NavbarContent({ role }: { role: UserRole }) {
           type="button"
           onClick={handleLogout}
           disabled={isLoggingOut}
-          className="flex items-center gap-1.5 rounded-2xl border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-700 shadow-2xs transition-all hover:bg-sky-50 active:scale-95 disabled:opacity-60"
+          className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-sky-200 bg-white px-2.5 py-2 text-xs font-bold text-sky-700 shadow-2xs transition-all hover:bg-sky-50 active:scale-95 disabled:opacity-60 sm:px-3"
         >
           <LogOut className="h-3.5 w-3.5 text-sky-500" />
           <span>{isLoggingOut ? 'Keluar...' : 'Logout'}</span>
