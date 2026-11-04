@@ -300,7 +300,6 @@ export function useBookingData<TPublic extends boolean = false>(
         kode_unit: formData.kode_unit,
         biaya_main,
         total: biaya_main,
-        status_pembayaran: formData.status_pembayaran,
         status_booking: formData.status_booking || 'Terkonfirmasi',
         sumber_booking: formData.sumber_booking || 'Booking',
         operator_kasir: formData.operator_kasir,
