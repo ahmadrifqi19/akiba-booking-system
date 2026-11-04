@@ -273,7 +273,7 @@ function CustomerDisplayContent({ showBranchSwitcher }: { showBranchSwitcher: bo
           </div>
 
           <a
-            href="https://dragonplay.id/portal.php?q=akibacore"
+            href="https://akibacore.id/"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 rounded-2xl bg-sky-500 px-5 py-2.5 text-xs font-bold text-white shadow-[0_6px_20px_-6px_rgba(14,165,233,0.7)] hover:bg-sky-600 transition-all active:scale-95 shrink-0"
