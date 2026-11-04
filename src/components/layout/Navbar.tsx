@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { ShoppingCart, BarChart3, LogOut, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,12 @@ import ThemeToggle from './ThemeToggle';
 
 export default function Navbar({ role }: { role: UserRole }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
+  
+  // Ambil kode cabang aktif dari URL query parameter (default ke CBG-01 jika tidak ada)
+  const activeCabang = searchParams.get('cabang') || 'CBG-01';
+
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
@@ -57,12 +62,14 @@ export default function Navbar({ role }: { role: UserRole }) {
         <nav className="flex items-center gap-1 rounded-2xl border border-sky-200 bg-sky-100/60 p-1 sm:gap-1.5">
           {navLinks.map((item) => {
             const Icon = item.icon;
+            // Pertahankan parameter cabang saat navigasi antar tab agar tidak ter-reset
+            const hrefWithCabang = `${item.href}?cabang=${activeCabang}`;
             const isActive = pathname.startsWith(item.href);
 
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={hrefWithCabang}
                 className={cn(
                   'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150',
                   isActive
@@ -84,7 +91,8 @@ export default function Navbar({ role }: { role: UserRole }) {
           <ThemeToggle compact />
           <div className="hidden flex-col items-end text-right sm:flex">
             <span className="text-xs font-bold text-sky-950">{role === 'owner' ? 'Owner' : 'Kasir'}</span>
-            <span className="text-[10px] font-bold text-sky-500">Cabang CBG-01</span>
+            {/* Keterangan cabang sekarang dinamis mengikuti URL */}
+            <span className="text-[10px] font-bold text-sky-500">Cabang {activeCabang}</span>
           </div>
           <button
             type="button"
